@@ -27,8 +27,8 @@ public:
                         curl_easy_perform(curl);
                         curl_easy_cleanup(curl);
                     }
-                    
-                    curl_slist_free_all(sHeaders)
+
+                    curl_slist_free_all(sHeaders);
                     return response;
                 })
                 .addFunction("post", [](const std::string& url, const std::string& data, const LuaRef& headers) -> std::string {
@@ -52,7 +52,7 @@ public:
                         curl_easy_cleanup(curl);
                     }
 
-                    curl_slist_free_all(sHeaders)
+                    curl_slist_free_all(sHeaders);
                     return response;
                 })
             .endNamespace();
