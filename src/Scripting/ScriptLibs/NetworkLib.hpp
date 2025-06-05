@@ -12,7 +12,7 @@ public:
 
         getGlobalNamespace(state)
             .beginNamespace("network")
-                .addFunction("get", [](const std::string& url, const std::vector<std::string>& headers) -> std::string {
+                .addFunction("get", [](const std::string& url, const LuaRef& headers) -> std::string {
                     CURL* curl = curl_easy_init();
                     std::string response;
 
@@ -30,7 +30,7 @@ public:
                     }
                     return response;
                 })
-                .addFunction("post", [](const std::string& url, const std::string& data, const std::vector<std::string>& headers) -> std::string {
+                .addFunction("post", [](const std::string& url, const std::string& data, const LuaRef& headers) -> std::string {
                     CURL* curl = curl_easy_init();
                     std::string response;
 
