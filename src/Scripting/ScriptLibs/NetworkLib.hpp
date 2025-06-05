@@ -15,7 +15,7 @@ public:
                     std::string response;
                     struct curl_slist* sHeaders = nullptr;
 
-                    for (luabridge::Iterator it(headers); !it.isNil(); ++it)
+                    for (luabridge::Iterator it(headers); !it.isNil(); ++it) {
                         sHeaders = curl_slist_append(sHeaders, it.value().cast<std::string>().c_str());
                     }
 
@@ -36,7 +36,7 @@ public:
                     std::string response;
                     struct curl_slist* sHeaders = nullptr;
                     
-                    for (luabridge::Iterator it(headers); !it.isNil(); ++it)
+                    for (luabridge::Iterator it(headers); !it.isNil(); ++it) {
                         sHeaders = curl_slist_append(sHeaders, it.value().cast<std::string>().c_str());
                     }
 
