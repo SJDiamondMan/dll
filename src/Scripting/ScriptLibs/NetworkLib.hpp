@@ -1,8 +1,6 @@
 #pragma once
 
 #include "ScriptLib.hpp"
-#include <numeric>
-
 #include <curl/curl/curl.h>
 
 class NetworkLib : public ScriptLib {
@@ -15,11 +13,12 @@ public:
                 .addFunction("get", [](const std::string& url, const LuaRef& headers) -> std::string {
                     CURL* curl = curl_easy_init();
                     std::string response;
+                    struct curl_slist* sHeaders;
 
-                    curl_slist* sHeaders = std::accumulate(headers.begin(), headers.end(), (curl_slist*)nullptr,[](curl_slist* sHeaders, const std::string& header) {
-                        return curl_slist_append(sHeaders, header.c_str());
-                    });
-
+                    for (luabridge::Iterator it(headers); !it.isNil(); ++it) {
+                        curl_slist_append(sHeaders, it.value().cast<std::string>);
+                    }
+                    
                     if (curl) {
                         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
                         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, sHeaders);
@@ -28,15 +27,19 @@ public:
                         curl_easy_perform(curl);
                         curl_easy_cleanup(curl);
                     }
+                    
+                    curl_slist_free_all(sHeaders)
                     return response;
                 })
                 .addFunction("post", [](const std::string& url, const std::string& data, const LuaRef& headers) -> std::string {
                     CURL* curl = curl_easy_init();
                     std::string response;
 
-                    curl_slist* sHeaders = std::accumulate(headers.begin(), headers.end(), (curl_slist*)nullptr,[](curl_slist* sHeaders, const std::string& header) {
-                        return curl_slist_append(sHeaders, header.c_str());
-                    });
+                    struct curl_slist* sHeaders;
+
+                    for (luabridge::Iterator it(headers); !it.isNil(); ++it) {
+                        curl_slist_append(sHeaders, it.value().cast<std::string>);
+                    }
 
                     if (curl) {
                         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
@@ -48,6 +51,8 @@ public:
                         curl_easy_perform(curl);
                         curl_easy_cleanup(curl);
                     }
+
+                    curl_slist_free_all(sHeaders)
                     return response;
                 })
             .endNamespace();
