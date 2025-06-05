@@ -11,12 +11,17 @@ public:
 
         getGlobalNamespace(state)
             .beginNamespace("network")
-                .addFunction("get", [](const std::string& url) -> std::string {
+                .addFunction("get", [](const std::string& url, const std::vector<std::string>& headers = {}) -> std::string {
                     CURL* curl = curl_easy_init();
                     std::string response;
 
+                    curl_slist* sHeaders = std::accumulate(headers.begin(), headers.end(), (curl_slist*)nullptr,[](curl_slist* sHeaders, const std::string& header) {
+                        return curl_slist_append(sHeaders, header.c_str());
+                    });
+
                     if (curl) {
                         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+                        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, sHeaders);
                         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
                         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
                         curl_easy_perform(curl);
@@ -28,10 +33,15 @@ public:
                     CURL* curl = curl_easy_init();
                     std::string response;
 
+                    curl_slist* sHeaders = std::accumulate(headers.begin(), headers.end(), (curl_slist*)nullptr,[](curl_slist* sHeaders, const std::string& header) {
+                        return curl_slist_append(sHeaders, header.c_str());
+                    });
+
                     if (curl) {
                         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
                         curl_easy_setopt(curl, CURLOPT_POST, 1L);
                         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.c_str());
+                        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, sHeaders);
                         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
                         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
                         curl_easy_perform(curl);
