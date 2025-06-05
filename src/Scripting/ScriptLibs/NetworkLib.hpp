@@ -13,10 +13,10 @@ public:
                 .addFunction("get", [](const std::string& url, const LuaRef& headers) -> std::string {
                     CURL* curl = curl_easy_init();
                     std::string response;
-                    struct curl_slist* sHeaders;
+                    struct curl_slist* sHeaders = nullptr;
 
                     for (luabridge::Iterator it(headers); !it.isNil(); ++it) {
-                        curl_slist_append(sHeaders, it.value().cast<std::string>());
+                        curl_slist_append(sHeaders, it.value().cast<std::string>().value());
                     }
                     
                     if (curl) {
@@ -35,10 +35,10 @@ public:
                     CURL* curl = curl_easy_init();
                     std::string response;
 
-                    struct curl_slist* sHeaders;
+                    struct curl_slist* sHeaders = nullptr;
 
                     for (luabridge::Iterator it(headers); !it.isNil(); ++it) {
-                        curl_slist_append(sHeaders, it.value().cast<std::string>());
+                        curl_slist_append(sHeaders, it.value().cast<std::string>().value());
                     }
 
                     if (curl) {
