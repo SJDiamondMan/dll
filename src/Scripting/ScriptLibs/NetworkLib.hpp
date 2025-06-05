@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ScriptLib.hpp"
+#include <numeric>
 
 #include <curl/curl/curl.h>
 
@@ -11,7 +12,7 @@ public:
 
         getGlobalNamespace(state)
             .beginNamespace("network")
-                .addFunction("get", [](const std::string& url, const std::vector<std::string>& headers = {}) -> std::string {
+                .addFunction("get", [](const std::string& url, const std::vector<std::string>& headers) -> std::string {
                     CURL* curl = curl_easy_init();
                     std::string response;
 
@@ -29,7 +30,7 @@ public:
                     }
                     return response;
                 })
-                .addFunction("post", [](const std::string& url, const std::string& data) -> std::string {
+                .addFunction("post", [](const std::string& url, const std::string& data, const std::vector<std::string>& headers) -> std::string {
                     CURL* curl = curl_easy_init();
                     std::string response;
 
