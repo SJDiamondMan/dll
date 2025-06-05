@@ -16,7 +16,7 @@ public:
                     struct curl_slist* sHeaders;
 
                     for (luabridge::Iterator it(headers); !it.isNil(); ++it) {
-                        curl_slist_append(sHeaders, it.value().cast<std::string>);
+                        curl_slist_append(sHeaders, it.value().cast<std::string>());
                     }
                     
                     if (curl) {
@@ -38,7 +38,7 @@ public:
                     struct curl_slist* sHeaders;
 
                     for (luabridge::Iterator it(headers); !it.isNil(); ++it) {
-                        curl_slist_append(sHeaders, it.value().cast<std::string>);
+                        curl_slist_append(sHeaders, it.value().cast<std::string>());
                     }
 
                     if (curl) {
