@@ -15,10 +15,10 @@ public:
                     std::string response;
                     struct curl_slist* sHeaders = nullptr;
 
-                    for (luabridge::Iterator it(headers); !it.isNil(); ++it) {
-                        curl_slist_append(sHeaders, it.value().cast<std::string>().value());
+                    for (luabridge::Iterator it(headers); !it.isNil(); ++it)
+                        sHeaders = curl_slist_append(sHeaders, it.value().cast<std::string>().c_str());
                     }
-                    
+
                     if (curl) {
                         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
                         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, sHeaders);
@@ -34,11 +34,10 @@ public:
                 .addFunction("post", [](const std::string& url, const std::string& data, const LuaRef& headers) -> std::string {
                     CURL* curl = curl_easy_init();
                     std::string response;
-
                     struct curl_slist* sHeaders = nullptr;
-
-                    for (luabridge::Iterator it(headers); !it.isNil(); ++it) {
-                        curl_slist_append(sHeaders, it.value().cast<std::string>().value());
+                    
+                    for (luabridge::Iterator it(headers); !it.isNil(); ++it)
+                        sHeaders = curl_slist_append(sHeaders, it.value().cast<std::string>().c_str());
                     }
 
                     if (curl) {
