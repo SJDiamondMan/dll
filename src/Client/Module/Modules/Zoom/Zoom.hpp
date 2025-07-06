@@ -1,5 +1,5 @@
 #pragma once
-
+#include "../../../Events/Events.hpp"
 #include "../Module.hpp"
 #include "../../../../SDK/Client/Core/Options.hpp"
 
@@ -11,6 +11,7 @@ private:
 	static float inline realFov = 70.0f;
 	static inline float currentSensitivity = 0.0f;
 	static inline bool saved = false;
+	static inline float currentFov = 70.0f;
 
 	static inline float unzoomAnimDisableTreshold = 0.2;
 
@@ -19,7 +20,8 @@ private:
 public:
 	static inline bool animationFinished = true;
 	static inline bool jdfAnimationFinished = true;
-	Zoom();;
+	Zoom();
+
 
 	void onEnable() override;
 
@@ -31,7 +33,9 @@ public:
 
 	void onGetFOV(FOVEvent& event);
 
-	void onGetSensitivity(SensitivityEvent& event);
+	void checkKeybind(int key);
+
+	void onRender(RenderEvent& event);
 
 	//TODO: RE CHECK
 	void onMouse(MouseEvent& event);
@@ -41,4 +45,5 @@ public:
 	// TODO: add dolly zoom and world2screen zoom stabilization ?
 	// TODO: if someone has disabled hand this will enable it unless changed in settings
 	void onSetTopScreenName(SetTopScreenNameEvent& event);
+	void onTurnDeltaEvent(TurnDeltaEvent& event);
 };

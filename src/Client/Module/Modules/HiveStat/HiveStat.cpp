@@ -13,8 +13,7 @@ void HiveStat::onEnable() {
     Module::onEnable();
     FlarialGUI::Notify("Hive Overlay works only in sky, bed, mm, ctf");
     FlarialGUI::Notify("To change the position of Hive Overlay, Please click " +
-                       ModuleManager::getModule("ClickGUI")->settings.getSettingByName<std::string>(
-                           "editmenubind")->value + " in the settings tab.");
+                       ModuleManager::getModule("ClickGUI")->settings.getSettingByName<std::string>("editmenubind")->value + " in the settings tab.");
 }
 
 void HiveStat::onDisable() {
@@ -44,6 +43,7 @@ void HiveStat::defaultConfig() {
     setDef("showLosses", false);
     setDef("showKills", false);
     setDef("showDeaths", false);
+    
 }
 
 void HiveStat::settingsRender(float settingsOffset) {
@@ -69,6 +69,8 @@ void HiveStat::settingsRender(float settingsOffset) {
     addToggle("Show Losses", "Shows the amount of losses a player has", "showLosses");
     addToggle("Show Kills", "Shows the amount of kills a player has", "showKills");
     addToggle("Show Deaths", "Shows the amount of deaths a player has", "showDeaths");
+
+    FlarialGUI::UnsetScrollView();
     resetPadding();
 }
 
@@ -100,7 +102,7 @@ void HiveStat::onRender(RenderEvent &event) {
             currentPos = Constraints::CenterConstraint(150, 150);
 
         if (ClickGUI::editmenu) {
-            FlarialGUI::SetWindowRect(currentPos.x, currentPos.y, 150, 50, 123);
+            FlarialGUI::SetWindowRect(currentPos.x, currentPos.y, 150, 50, 123, this->name);
             FlarialGUI::FlarialTextWithFont(currentPos.x, currentPos.y,
                                             L"Overlay", 150, 50,
                                             DWRITE_TEXT_ALIGNMENT_LEADING, Constraints::SpacingConstraint(1.05, 150),
@@ -479,6 +481,7 @@ void HiveStat::onRender(RenderEvent &event) {
 }
 
 void HiveStat::onPacketReceive(PacketEvent &event) {
+    if (!this->isEnabled()) return;
     if (SDK::getServerIP().find("hive") == std::string::npos) return;
     MinecraftPacketIds id = event.getPacket()->getId();
 
@@ -496,7 +499,7 @@ void HiveStat::onPacketReceive(PacketEvent &event) {
 }
 
 void HiveStat::onKey(KeyEvent &event) {
-
+    if (!this->isEnabled()) return;
     if (event.getKey() == Utils::getStringAsKey(getOps<std::string>("Overlay")) &&
         static_cast<ActionType>(event.getAction()) == ActionType::Released) {
         renderOverlay = !renderOverlay;

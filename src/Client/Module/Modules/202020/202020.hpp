@@ -10,7 +10,7 @@ public:
 	std::chrono::seconds elapsed;
 
 	Module202020() : Module("Meds", "Implements the medical 202020 rule\ninto minecraft.", IDR_TIME_PNG, "") {
-		Module::setup();
+		
 	};
 
 	void onEnable() override {
@@ -28,6 +28,7 @@ public:
 	void defaultConfig() override {
 		Module::defaultConfig();
 		setDef("extreme", false);
+		
 	}
 
 	void settingsRender(float settingsOffset) override {
@@ -49,6 +50,7 @@ public:
 	}
 
 	void onRender(RenderEvent& event) {
+		if (!this->isEnabled()) return;
 		now = std::chrono::steady_clock::now();
 		elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - last);
 

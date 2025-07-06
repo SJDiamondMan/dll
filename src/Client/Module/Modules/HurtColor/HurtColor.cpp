@@ -13,8 +13,10 @@ void HurtColor::onDisable() {
 }
 
 void HurtColor::defaultConfig() {
+    settings.renameSetting("color", "colorOpacity", "color_rgb", "hurt");
     Module::defaultConfig("core");
     setDef("hurt", (std::string)"FFFFFF", 0.65f, false);
+    
 }
 
 void HurtColor::settingsRender(float settingsOffset) {
@@ -37,7 +39,8 @@ void HurtColor::settingsRender(float settingsOffset) {
 }
 
 void HurtColor::onGetHurtColor(HurtColorEvent &event) {
+    if (!this->isEnabled()) return;
     D2D1_COLOR_F color = getColor("hurt");
 
-    event.setHurtColorFromD2DColor(color, getOps<float>("colorOpacity"));
+    event.setHurtColorFromD2DColor(color, getOps<float>("hurtOpacity"));
 }

@@ -4,15 +4,11 @@
 #include "../../Events/Events.hpp"
 #include "ClickGUI/ClickGUI.hpp"
 #include "Scripting/ScriptManager.hpp"
+#include "../../../Utils/Telemetry.hpp"
 #include <vector>
+#include <cmath>
 
 #define clickgui ModuleManager::getModule("ClickGUI")
-
-std::map<std::string, DWRITE_TEXT_ALIGNMENT> alignments = {
-		{"Left", DWRITE_TEXT_ALIGNMENT_LEADING},
-		{"Center", DWRITE_TEXT_ALIGNMENT_CENTER},
-		{"Right", DWRITE_TEXT_ALIGNMENT_TRAILING}
-};
 
 static std::string Lname = "";
 
@@ -29,23 +25,8 @@ D2D_COLOR_F Module::getColor(std::string text, std::string mod) {
 	return col;
 };
 
-template <typename T>
-void Module::setDef(std::string setting, T value) {
-	this->settings.getOrAddSettingByName<T>(setting, value);
-}
-
-void Module::setDef(std::string setting, std::string col, float opac, bool rgb) {
-	this->settings.getOrAddSettingByName<std::string>(setting + "Col", col);
-	this->settings.getOrAddSettingByName<float>(setting + "Opacity", opac);
-	this->settings.getOrAddSettingByName<bool>(setting + "RGB", rgb);
-}
-
-template <typename T>
-T& Module::getOps(std::string setting) {
-	return this->settings.getSettingByName<T>(setting)->value;
-}
-
 void Module::normalRenderCore(int index, std::string& text) {
+	if (!this->isEnabled()) return;
 	float rotation = getOps<float>("rotation");
 	DWRITE_TEXT_ALIGNMENT alignment = alignments[getOps<std::string>("textalignment")];
 	bool responsivewidth = getOps<bool>("responsivewidth");
@@ -86,7 +67,7 @@ void Module::normalRenderCore(int index, std::string& text) {
 	if (prevAlignments[index] == DWRITE_TEXT_ALIGNMENT_JUSTIFIED) prevAlignments[index] = alignment;
 
 	if (prevAlignments[index] != alignment) {
-		float toAdjust;
+		float toAdjust = 0;
 		if (prevAlignments[index] == DWRITE_TEXT_ALIGNMENT_CENTER) {
 			if (alignment == DWRITE_TEXT_ALIGNMENT_LEADING) toAdjust = rectWidth / -2.f;
 			else toAdjust = rectWidth / 2.f;
@@ -114,11 +95,11 @@ void Module::normalRenderCore(int index, std::string& text) {
 	}
 
 	if (ClickGUI::editmenu) {
-		FlarialGUI::SetWindowRect(topleft.x, topleft.y, rectWidth, rectHeight, index);
-
-		Vec2<float> vec2 = FlarialGUI::CalculateMovedXY(topleft.x, topleft.y, index, rectWidth, rectHeight);
+		FlarialGUI::SetWindowRect(topleft.x, topleft.y, rectWidth, rectHeight, index, this->name);
 
 		checkForRightClickAndOpenSettings(topleft.x, topleft.y, rectWidth, rectHeight);
+
+		Vec2<float> vec2 = FlarialGUI::CalculateMovedXY(topleft.x, topleft.y, index, rectWidth, rectHeight);
 
 		if (alignment != DWRITE_TEXT_ALIGNMENT_LEADING) {
 			if (alignment == DWRITE_TEXT_ALIGNMENT_TRAILING) vec2.x += rectWidth;
@@ -154,12 +135,15 @@ void Module::normalRenderCore(int index, std::string& text) {
 		getColor("glow"), rounde.x,
 		(getOps<float>("glowAmount") / 100.f) * Constraints::PercentageConstraint(0.1f, "top"));
 
+	float blur = Client::settings.getSettingByName<float>("blurintensity")->value;
 	if (getOps<bool>("BlurEffect"))
 		FlarialGUI::BlurRect(D2D1::RoundedRect(D2D1::RectF(topleft.x, topleft.y, topleft.x + rectWidth, topleft.y + rectHeight), rounde.x, rounde.x));
+		//Blur::RenderBlur(SwapchainHook::mainRenderTargetView, 3, blur, topleft.x, topleft.y, rectWidth, rectHeight, rounde.x);
+
 
 	if (getOps<bool>("rectShadow")) FlarialGUI::RoundedRect(
-		topleft.x + Constraints::RelativeConstraint(getOps<float>("rectShadowOffset")),
-		topleft.y + Constraints::RelativeConstraint(getOps<float>("rectShadowOffset")),
+		topleft.x + Constraints::RelativeConstraint(getOps<float>("rectShadowOffset")) * getOps<float>("uiscale"),
+		topleft.y + Constraints::RelativeConstraint(getOps<float>("rectShadowOffset")) * getOps<float>("uiscale"),
 		getColor("rectShadow"),
 		rectWidth,
 		rectHeight,
@@ -248,7 +232,8 @@ void Module::resetPadding() {
 
 	int i = 100;
 	for (int i = 100; i < colorPickerIndex; ++i) {
-		FlarialGUI::ColorPickerWindow(i, this->name, color_pickers[i]);
+		if (color_pickers2.count(i)) FlarialGUI::ColorPickerWindow(i, *color_pickers2[i].value, *color_pickers2[i].opacity, *color_pickers2[i].rgb);
+		else FlarialGUI::ColorPickerWindow(i, this->name, color_pickers[i]);
 	}
 
 	colorPickerIndex = 100;
@@ -266,7 +251,7 @@ void Module::addHeader(std::string text) {
 	float y = Constraints::PercentageConstraint(0.10, "top") + padding;
 
 
-	D2D1_COLOR_F col = clickgui->getColor("secondary6", "ClickGUI");
+	D2D1_COLOR_F col = ClickGUI::getColor("secondary6");
 	col.a = ClickGUI::settingsOpacity;
 	D2D1_COLOR_F textCol = D2D1::ColorF(D2D1::ColorF::White);
 	textCol.a = ClickGUI::settingsOpacity;;
@@ -279,6 +264,7 @@ void Module::addHeader(std::string text) {
 				y += FlarialGUI::additionalY[i];
 			}
 		}
+
 	FlarialGUI::RoundedRect(x, y + Constraints::RelativeConstraint(0.023f, "width"), col, FlarialGUI::TextSizes[name] + Constraints::RelativeConstraint(0.01f, "width"), 3.0f, 0, 0);
 
 	padding += Constraints::RelativeConstraint(0.055f, "height", true);
@@ -290,7 +276,7 @@ void Module::addElementText(std::string text, std::string subtext) {
 
 	float subtextY;
 	float fontSize = Constraints::RelativeConstraint(0.140f, "height", true);
-	float fontSize2 = Constraints::RelativeConstraint(0.132f, "height", true);
+	float fontSize2 = Constraints::RelativeConstraint(0.12f, "height", true);
 
 	if (!subtext.empty()) {
 		subtextY = y;
@@ -317,17 +303,17 @@ void Module::addElementText(std::string text, std::string subtext) {
 }
 
 void Module::addButton(const std::string& text, const std::string& subtext, const std::string& buttonText, std::function<void()> action) {
-	float elementX = Constraints::PercentageConstraint(0.15f, "right");
+	float elementX = Constraints::PercentageConstraint(0.161f, "right");
 	float y = Constraints::PercentageConstraint(0.10, "top") + padding;
 	const float width = Constraints::RelativeConstraint(0.09f, "height", true);
 	const float height = Constraints::RelativeConstraint(0.035, "height", true);
 	Vec2<float> round = Constraints::RoundingConstraint(13, 13);
-	D2D1_COLOR_F col = clickgui->getColor("primary1", "ClickGUI");
+	D2D1_COLOR_F col = ClickGUI::getColor("primary1");
 	col.a = ClickGUI::settingsOpacity;
 	D2D1_COLOR_F f = D2D1::ColorF(D2D1::ColorF::White);
 	f.a = ClickGUI::settingsOpacity;
 
-	if (FlarialGUI::RoundedButton(buttonIndex, elementX, y, col, f, FlarialGUI::to_wide(buttonText).c_str(), width, height, round.x, round.y)) {
+	if (FlarialGUI::RoundedButton(buttonIndex, elementX, y - height / 2.f, col, f, FlarialGUI::to_wide(buttonText).c_str(), width, height, round.x, round.y)) {
 		action();
 	}
 
@@ -450,6 +436,41 @@ void Module::addConditionalColorPicker(bool condition, std::string text, std::st
 	FlarialGUI::ResetOverrideAlphaValues();
 }
 
+void Module::addColorPicker(std::string text, std::string subtext, std::string& value, float& opacity, bool& rgb) {
+	float elementX = Constraints::PercentageConstraint(0.195f, "right");
+	float y = Constraints::PercentageConstraint(0.10, "top") + padding;
+
+	FlarialGUI::ColorPicker(colorPickerIndex, elementX, y, value, rgb);
+
+	Module::addElementText(text, subtext);
+
+	padding += Constraints::RelativeConstraint(0.05f, "height", true);
+
+	ColorPickerStruct respect = { &value, &opacity, &rgb };
+	color_pickers2[colorPickerIndex] = respect;
+	colorPickerIndex++;
+}
+
+void Module::addConditionalColorPicker(bool condition, std::string text, std::string subtext, std::string& value, float& opacity, bool& rgb) {
+	FlarialGUI::OverrideAlphaValues((Constraints::RelativeConstraint(0.05f, "height", true) - conditionalColorPickerAnims[colorPickerIndex]) / Constraints::RelativeConstraint(0.05f, "height", true));
+
+	if (condition) {
+		padding -= conditionalColorPickerAnims[colorPickerIndex];
+		FlarialGUI::lerp(conditionalColorPickerAnims[colorPickerIndex], 0.0f, 0.25f * FlarialGUI::frameFactor);
+		Module::addColorPicker(text, subtext, value, opacity, rgb);
+	}
+	else {
+		FlarialGUI::lerp(conditionalColorPickerAnims[colorPickerIndex], Constraints::RelativeConstraint(0.05f, "height", true), 0.25f * FlarialGUI::frameFactor);
+		if (conditionalColorPickerAnims[colorPickerIndex] < Constraints::RelativeConstraint(0.0499f, "height", true)) {
+			padding -= conditionalColorPickerAnims[colorPickerIndex];
+			Module::addColorPicker(text, subtext, value, opacity, rgb);
+		}
+		else colorPickerIndex++;
+	}
+
+	FlarialGUI::ResetOverrideAlphaValues();
+}
+
 void Module::addConditionalDropdown(bool condition, std::string text, std::string subtext, const std::vector<std::string>& options, std::string& value) {
 	FlarialGUI::OverrideAlphaValues((Constraints::RelativeConstraint(0.05f, "height", true) - conditionalDropdownAnims[dropdownIndex]) / Constraints::RelativeConstraint(0.05f, "height", true));
 
@@ -530,12 +551,47 @@ void Module::addConditionalSlider(bool condition, std::string text, std::string 
 	FlarialGUI::ResetOverrideAlphaValues();
 }
 
+void Module::addConditionalSliderInt(bool condition, std::string text, std::string subtext, std::string settingName, int maxVal, int minVal) {
+	FlarialGUI::OverrideAlphaValues((Constraints::RelativeConstraint(0.05f, "height", true) - conditionalSliderAnims[sliderIndex]) / Constraints::RelativeConstraint(0.05f, "height", true));
+
+	if (condition) {
+		padding -= conditionalSliderAnims[sliderIndex];
+		FlarialGUI::lerp(conditionalSliderAnims[sliderIndex], 0.0f, 0.25f * FlarialGUI::frameFactor);
+		Module::addSliderInt(text, subtext, settingName, maxVal, minVal);
+	}
+	else {
+		FlarialGUI::lerp(conditionalSliderAnims[sliderIndex], Constraints::RelativeConstraint(0.05f, "height", true), 0.25f * FlarialGUI::frameFactor);
+		if (conditionalSliderAnims[sliderIndex] < Constraints::RelativeConstraint(0.0499f, "height", true)) {
+			padding -= conditionalSliderAnims[sliderIndex];
+			Module::addSliderInt(text, subtext, settingName, maxVal, minVal);
+		}
+		else sliderIndex++;
+	}
+
+	FlarialGUI::ResetOverrideAlphaValues();
+}
+
+void Module::addSliderInt(std::string text, std::string subtext, std::string settingName, int maxVal, int minVal) {
+	float elementX = Constraints::PercentageConstraint(0.33f, "right");
+	float y = Constraints::PercentageConstraint(0.10, "top") + padding;
+
+	int& value = settings.getSettingByName<int>(settingName)->value;
+
+	value = std::clamp(value, minVal, maxVal);
+
+	FlarialGUI::SliderInt(sliderIndex, elementX, y, value, maxVal, minVal, this->name, settingName);
+
+	Module::addElementText(text, subtext);
+
+	padding += Constraints::RelativeConstraint(0.05f, "height", true);
+	sliderIndex++;
+}
+
 void Module::addSlider(std::string text, std::string subtext, float& value, float maxVal, float minVal, bool zerosafe) {
 	float elementX = Constraints::PercentageConstraint(0.33f, "right");
 	float y = Constraints::PercentageConstraint(0.10, "top") + padding;
 
-	if (value > maxVal) value = maxVal;
-	else if (value < minVal) value = minVal;
+	value = std::clamp(value, minVal, maxVal);
 
 	FlarialGUI::Slider(sliderIndex, elementX, y, value, maxVal, minVal, zerosafe);
 
@@ -551,8 +607,7 @@ void Module::addSlider(std::string text, std::string subtext, std::string settin
 
 	float& value = settings.getSettingByName<float>(settingName)->value;
 
-	if (value > maxVal) value = maxVal;
-	else if (value < minVal) value = minVal;
+	value = std::clamp(value, minVal, maxVal);
 
 	FlarialGUI::Slider(sliderIndex, elementX, y, value, maxVal, minVal, zerosafe, this->name, settingName);
 
@@ -609,7 +664,7 @@ void Module::addToggle(std::string text, std::string subtext, bool& value) {
 }
 
 void Module::addKeybind(std::string text, std::string subtext, std::string& keybind) {
-	float elementX = Constraints::PercentageConstraint(0.13f, "right");
+	float elementX = Constraints::PercentageConstraint(0.134f, "right");
 	float y = Constraints::PercentageConstraint(0.08, "top") + padding;
 
 	FlarialGUI::KeybindSelector(keybindIndex, elementX, y, keybind);
@@ -621,7 +676,7 @@ void Module::addKeybind(std::string text, std::string subtext, std::string& keyb
 }
 
 void Module::addKeybind(std::string text, std::string subtext, std::string settingName, bool resettable) {
-	float elementX = Constraints::PercentageConstraint(0.13f, "right");
+	float elementX = Constraints::PercentageConstraint(0.134f, "right");
 	float y = Constraints::PercentageConstraint(0.08, "top") + padding;
 
 	FlarialGUI::KeybindSelector(keybindIndex, elementX, y, getOps<std::string>(settingName), this->name, settingName);
@@ -632,69 +687,30 @@ void Module::addKeybind(std::string text, std::string subtext, std::string setti
 	keybindIndex++;
 }
 
-void Module::loadDefaults() {
-	settings.reset();
-	setup();
-}
+void Module::postLoad(bool softLoad) {
+	this->totalKeybinds = 0;
+	this->totalWaypoints = 0;
+	this->totalmaps = 0;
+	keybindActions.clear();
 
-void Module::saveSettings() {
-	if (isScripting()) {
-		settingspath = fmt::format("{}\\Scripts\\Configs\\{}.flarial", Utils::getClientPath(), name);
-	}
-	else if (Client::settings.getSettingByName<std::string>("currentConfig")->value != "default") {
-		settingspath = fmt::format("{}\\{}\\{}.flarial", Utils::getConfigsPath(), Client::settings.getSettingByName<std::string>("currentConfig")->value, name);
-	}
-	else {
-		settingspath = fmt::format("{}\\{}.flarial", Utils::getConfigsPath(), name);
-	}
-	checkSettingsFile();
+	if (Client::hasLegacySettings) this->loadLegacySettings();
 
-	try {
-		std::ofstream outputFile(settingspath);
-		if (!outputFile.is_open()) {
-			LOG_ERROR("Failed to open file for writing: {}", settingspath.string());
-			return;
-		}
-		outputFile << settings.ToJson();
-		outputFile.close();
-	}
-	catch (const std::exception& e) {
-		LOG_ERROR("An error occurred while saving settings: {}", e.what());
-	}
-}
+	if (!isScripting()) this->defaultConfig();
+	else this->defaultConfig();
 
-void Module::loadSettings() {
-	if (isScripting()) {
-		settingspath = fmt::format("{}\\Scripts\\Configs\\{}.flarial", Utils::getClientPath(), name);
-	}
-	else if (Client::settings.getSettingByName<std::string>("currentConfig")->value != "default") {
-		settingspath = fmt::format("{}\\{}\\{}.flarial", Utils::getConfigsPath(), Client::settings.getSettingByName<std::string>("currentConfig")->value, name);
-	}
-	else {
-		settingspath = fmt::format("{}\\{}.flarial", Utils::getConfigsPath(), name);
-	}
-	checkSettingsFile();
+	keybindActions.push_back([this](std::vector<std::any> args)-> std::any {
+		if (SDK::getCurrentScreen() != "hud_screen" &&
+			SDK::getCurrentScreen() != "zoom_screen" &&
+			SDK::getCurrentScreen() != "f3_screen" && this->name != "ClickGUI"
+			) return {};
+		this->active = !this->active;
+		return {};
+		});
 
-	std::ifstream inputFile(settingspath);
-	if (!inputFile.is_open()) {
-		LOG_ERROR("Failed to open file: {}", settingspath.string());
-		return;
+	if (!softLoad && this->settings.getSettingByName<bool>("enabled") && getOps<bool>("enabled")) {
+		this->onEnable();
+		this->enabledState = true;
 	}
-
-	std::stringstream ss;
-	ss << inputFile.rdbuf();
-	inputFile.close();
-
-	if (!ss.str().empty() && ss.str() != "null") {
-		settings.FromJson(ss.str());
-	}
-	else {
-		this->loadDefaults();
-	}
-
-	totalKeybinds = 0;
-	totalWaypoints = 0;
-	totalmaps = 0;
 
 	for (const auto& settingPair : settings.settings) {
 		const std::string& name = settingPair.first;
@@ -708,17 +724,63 @@ void Module::loadSettings() {
 			++totalmaps;
 		}
 	}
+
+	this->onSetup();
+
+	
 }
 
-void Module::checkSettingsFile() {
-	if (!std::filesystem::exists(settingspath)) {
-		std::filesystem::create_directories(settingspath.parent_path());
-		std::ofstream outputFile(settingspath);
-		if (!outputFile.is_open()) {
-			LOG_ERROR("Failed to create file: {}", settingspath.string());
-		}
-		outputFile.close();
+void Module::loadLegacySettings() {
+	if (isScripting() || !Client::legacySettings.getSettingByName<std::string>("currentConfig")) return;
+	if (Client::legacySettings.getSettingByName<std::string>("currentConfig")->value != "default") legacySettingsPath = std::filesystem::path(Client::legacyDir) / Client::legacySettings.getSettingByName<std::string>("currentConfig")->value / (name + ".flarial");
+	else if (std::filesystem::exists(Client::legacyDir + "\\default") && std::filesystem::is_directory(Client::legacyDir + "\\default")) legacySettingsPath = std::filesystem::path(Client::legacyDir) / "default" / (name + ".flarial");
+	else legacySettingsPath = std::filesystem::path(Client::legacyDir) / (name + ".flarial");
+
+	if (!std::filesystem::exists(legacySettingsPath)) return;
+
+	std::ifstream inputFile(legacySettingsPath);
+	if (!inputFile.is_open()) {
+		Logger::error("Failed to open legacy settings file: {}", legacySettingsPath.string());
+		return;
 	}
+
+	std::stringstream ss;
+	ss << inputFile.rdbuf();
+	inputFile.close();
+
+	if (!ss.str().empty() && ss.str() != "null") this->settings.AppendFromJson(ss.str(), true);
+}
+
+void Module::loadSettings(bool softLoad) {
+	if (this->isScripting()) {
+		if (!std::filesystem::exists(settingspath)) {
+			std::filesystem::create_directories(settingspath.parent_path());
+			std::ofstream outputFile(settingspath);
+			if (!outputFile.is_open()) {
+				LOG_ERROR("Failed to create file: {}", settingspath.string());
+			}
+			outputFile.close();
+		}
+		std::ifstream inputFile(this->settingspath);
+		if (!inputFile.is_open()) {
+			LOG_ERROR("Failed to open file: {}", this->settingspath.string());
+			return;
+		}
+
+		std::stringstream ss;
+		ss << inputFile.rdbuf();
+		inputFile.close();
+
+		if (!ss.str().empty() && ss.str() != "null") this->settings.FromJson(ss.str());
+		else this->defaultConfig("all");
+	}
+	else {
+		try { settings.FromJson(Client::globalSettings[name].dump()); }
+		catch (std::exception& e) { Logger::error("Couldn't load module settings: {}", e.what()); }
+	}
+	
+
+	this->postLoad(softLoad);
 }
 
 void Module::toggle() {
@@ -727,36 +789,36 @@ void Module::toggle() {
 
 void Module::setup() {
 	if (!isScripting()) this->defaultConfig();
-	else Module::defaultConfig();
+	else this->defaultConfig();
+
 	keybindActions.push_back([this](std::vector<std::any> args)-> std::any {
 		this->active = !this->active;
 		return {};
 		});
 
 	onSetup();
-	// TODO: might call on enable twice
-
-	if (getOps<bool>("enabled")) onEnable();
 }
 
 void Module::onSetup() {}
 
 // TODO: rename to Enable/Disable?
 void Module::onEnable() {
+	Telemetry::sendModuleEvent(this->name, "enable");
+	
 	enabledState = true;
-	if (settings.getSettingByName<bool>("enabled"))
-		getOps<bool>("enabled") = true;
-	saveSettings();
+	if (settings.getSettingByName<bool>("enabled")) getOps<bool>("enabled") = true;
+	// Client::SaveSettings();
 }
 
 void Module::onDisable() {
+	Telemetry::sendModuleEvent(this->name, "disable");
+	
 	enabledState = false;
 	active = false;
 	if (!terminating) {
-		if (settings.getSettingByName<bool>("enabled"))
-			getOps<bool>("enabled") = false;
+		if (settings.getSettingByName<bool>("enabled")) getOps<bool>("enabled") = false;
 	}
-	saveSettings();
+	// Client::SaveSettings();
 }
 
 void Module::terminate() {
@@ -781,16 +843,21 @@ void Module::setEnabled(bool enabled) {
 
 void Module::setKeybind(const std::string& newKeybind) {
 	auto key = settings.getSettingByName<std::string>("keybind");
-	if (key == nullptr)
-		settings.addSetting("keybind", newKeybind);
+	if (key == nullptr) settings.addSetting("keybind", newKeybind);
 }
 
 std::string& Module::getKeybind(const int keybindCount) {
 	std::string count;
 	if (keybindCount > 0) count = "-" + FlarialGUI::cached_to_string(keybindCount);
 	auto key = settings.getSettingByName<std::string>("keybind" + count);
-	if (key == nullptr)
-		settings.addSetting("keybind", defaultKeybind);
+	if (key == nullptr) settings.addSetting("keybind", defaultKeybind);
+	return key->value;
+}
+
+std::string& Module::getKeybind(const int keybindCount, bool whoCaresIfItsZeroOrNotTf) {
+	std::string count = "-" + FlarialGUI::cached_to_string(keybindCount);
+	auto key = settings.getSettingByName<std::string>("keybind" + count);
+	if (key == nullptr) settings.addSetting("keybind", defaultKeybind);
 	return key->value;
 }
 
@@ -816,7 +883,7 @@ void Module::defaultAddSettings(std::string type) {
 	}
 	else if (type == "colors") {
 		addColorPicker("Text Color", "", "text");
-		addColorPicker("Background Color", "", "bg");
+		addConditionalColorPicker(getOps<bool>("showBg"), "Background Color", "", "bg");
 		addConditionalColorPicker(getOps<bool>("rectShadow"), "Background Shadow Color", "", "rectShadow");
 		addConditionalColorPicker(getOps<bool>("textShadow"), "Text Shadow Color", "", "textShadow");
 		addConditionalColorPicker(getOps<bool>("border"), "Border Color", "", "border");
@@ -835,11 +902,15 @@ void Module::defaultAddSettings(std::string type) {
 }
 
 void Module::defaultConfig(std::string type) {
+	settings.renameSetting("bgColor", "bgCol");
+	settings.renameSetting("textColor", "textCol");
+	settings.renameSetting("glowColor", "glowCol");
+	settings.renameSetting("borderColor", "borderCol");
 	if (type == "core") {
 		setDef("enabled", false);
 		setDef("favorite", false);
 	}
-	else if (type == "pos") {
+	if (type == "pos") {
 		setDef("percentageX", 0.0f);
 		setDef("percentageY", 0.0f);
 	}
@@ -896,6 +967,7 @@ void Module::defaultConfig() {
 }
 
 bool Module::isKeybind(const std::array<bool, 256>& keys, const int keybindCount) {
+	getKeybind();
 	std::string count = "keybind";
 	if (keybindCount > 0) count += "-" + FlarialGUI::cached_to_string(keybindCount);
 	if (!settings.getSettingByName<std::string>(count)) { return false; }
@@ -945,11 +1017,26 @@ bool Module::isKeyPartOfAdditionalKeybind(int keyCode, const std::string& bind) 
 	return std::find(keyCodes.begin(), keyCodes.end(), keyCode) != keyCodes.end();
 }
 
+long long _lastScrollId = 0;
+
 void Module::checkForRightClickAndOpenSettings(float x, float y, float width, float height) {
+	if (MC::scrollId != _lastScrollId) {
+		if (FlarialGUI::CursorInRect(x, y, width, height)) {
+			if (MC::lastMouseScroll == MouseAction::ScrollUp) {
+				auto uiscale = this->settings.getSettingByName<float>("uiscale");
+				if (uiscale != nullptr) uiscale->value = std::min(5.f, uiscale->value + 0.05f);
+				_lastScrollId = MC::scrollId;
+			}
+			else {
+				auto uiscale = this->settings.getSettingByName<float>("uiscale");
+				if (uiscale != nullptr) uiscale->value = std::max(0.01f, uiscale->value - 0.05f);
+				_lastScrollId = MC::scrollId;
+			}
+		}
+	}
 	if (FlarialGUI::CursorInRect(x, y, width, height) && MC::mouseButton == MouseButton::Right && MC::held) {
 		auto module = ModuleManager::getModule("ClickGUI");
 		if (module != nullptr) {
-
 			module->active = true;
 			ClickGUI::editmenu = false;
 			FlarialGUI::TextBoxes[0].isActive = false;

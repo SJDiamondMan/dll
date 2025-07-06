@@ -39,6 +39,7 @@ void AutoRQ::defaultConfig() {
     setDef("noteaming", false);
     setDef("friendaccept", false);
     setDef("partyaccept", false);
+    
 }
 
 void AutoRQ::settingsRender(float settingsOffset) {
@@ -76,7 +77,7 @@ void AutoRQ::settingsRender(float settingsOffset) {
 
         int i = totalmaps;
 
-        this->saveSettings();
+        Client::SaveSettings();
         FlarialGUI::Notify("New textbox created, input a map to avoid!");
         totalmaps++;
     });
@@ -129,6 +130,7 @@ void AutoRQ::settingsRender(float settingsOffset) {
 }
 
 void AutoRQ::onPacketReceive(PacketEvent &event) {
+    if (!this->isEnabled()) return;
     MinecraftPacketIds id = event.getPacket()->getId();
 
     if (id == MinecraftPacketIds::SetTitle) {
@@ -341,6 +343,7 @@ void AutoRQ::onPacketReceive(PacketEvent &event) {
 }
 
 void AutoRQ::reQ() {
+    if (!this->isEnabled()) return;
     if (!getOps<bool>("hub")) {
         FlarialGUI::Notify("Finding a new game of " + HiveModeCatcherListener::fullgamemodename);
 

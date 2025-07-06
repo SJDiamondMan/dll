@@ -21,6 +21,7 @@ void ComboCounter::onDisable() {
 void ComboCounter::defaultConfig() {
     setDef("text", (std::string)"Combo: {value}");
     Module::defaultConfig("all");
+    
 }
 
 void ComboCounter::settingsRender(float settingsOffset) {
@@ -59,6 +60,7 @@ void ComboCounter::settingsRender(float settingsOffset) {
 }
 
 void ComboCounter::onAttack(AttackEvent &event) {
+    if (!this->isEnabled()) return;
     if (std::chrono::high_resolution_clock::now() - last_hit > std::chrono::milliseconds(480)) {
         Combo++;
         last_hit = std::chrono::high_resolution_clock::now();
@@ -66,6 +68,7 @@ void ComboCounter::onAttack(AttackEvent &event) {
 }
 
 void ComboCounter::onTick(TickEvent &event) {
+    if (!this->isEnabled()) return;
     if (!SDK::clientInstance->getLocalPlayer())
         return;
 

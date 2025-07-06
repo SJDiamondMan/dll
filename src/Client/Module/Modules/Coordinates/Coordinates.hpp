@@ -12,7 +12,7 @@ public:
 
 	Coordinates() : Module("Coordinates", "Shows your XYZ position in game.",
 		IDR_COORDINATES_PNG, "") {
-		Module::setup();
+		
 	};
 
 	void onEnable() override;
@@ -26,6 +26,8 @@ public:
 	StringMap getCoords(float multiplier);
 
 	std::string formattedDimension(std::string dimension);
+
+	std::string sigma(float val);
 
 	void onRender(RenderEvent& event);
 

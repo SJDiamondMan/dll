@@ -15,7 +15,7 @@ class BlockOutline : public Module {
 public:
 	OptionsParser options;
 	BlockOutline() : Module("Block Outline", "Changes the block outline color", IDR_BLOCK_PNG, "") {
-		Module::setup();
+		
 		options.parseOptionsFile();
 
 	};
@@ -29,4 +29,7 @@ public:
 	void settingsRender(float settingsOffset) override;
 
 	void onOutlineSelection(RenderOutlineSelectionEvent& event);
+
+	void drawOverlay(MCDrawUtil3D dc, Vec3<float> bp, D2D_COLOR_F col, auto face, bool full);
+	void drawOutline(MCDrawUtil3D dc, Vec3<float> bp, D2D_COLOR_F col, bool full, float width);
 };

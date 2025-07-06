@@ -1,6 +1,7 @@
 #include "DirectionHUD.hpp"
 
 #include "Modules/ClickGUI/ClickGUI.hpp"
+#include "Modules/Waypoints/Waypoints.hpp"
 
 void DirectionHUD::onEnable() {
     Listen(this, RenderEvent, &DirectionHUD::onRender);
@@ -13,11 +14,13 @@ void DirectionHUD::onDisable() {
 }
 
 void DirectionHUD::defaultConfig() {
+    settings.changeType<float, int>("degreesDecimalCount");
     getKeybind();
     Module::defaultConfig("core");
     Module::defaultConfig("pos");
     Module::defaultConfig("main");
     setDef("moreScales", true);
+    setDef("hideWhenTabList", true);
     setDef("pixelsPerDegree", 1.5f);
     setDef("wrapFade", true);
     setDef("fadeDistancePerc", 75.f);
@@ -45,14 +48,15 @@ void DirectionHUD::defaultConfig() {
     setDef("ordinalTextShadow", (std::string)"000000", 1.f, false);
     setDef("cardinalScaleShadow", (std::string)"000000", 1.f, false);
     setDef("ordinalScaleShadow", (std::string)"000000", 1.f, false);
+    setDef("showWaypoints", true);
     setDef("showDegrees", true);
-    setDef("degreeSymbol", true);
-    setDef("degreesDecimalCount", 2.f);
+    setDef("degreesDecimalCount", 2);
     setDef("degreesTextSize", 1.2f);
     setDef("degreesTextOffset", 6.1f);
     setDef("degreesText", (std::string)"ffffff", 1.f, false);
     setDef("degreesTextShadow", true);
     setDef("degreesTextShadow", (std::string)"000000", 1.f, false);
+    setDef("degreesTextShadowOffset", 0.003f);
 }
 
 void DirectionHUD::settingsRender(float settingsOffset) {
@@ -68,10 +72,10 @@ void DirectionHUD::settingsRender(float settingsOffset) {
 
     addHeader("Direction HUD");
     defaultAddSettings("main");
+    addToggle("Hide on TabList enable", "", "hideWhenTabList");
     addSlider("Pixels Per Degree", "", "pixelsPerDegree", 20.f, 0.001f);
     addToggle("Wrap Around Fade", "", "wrapFade");
     addConditionalSlider(getOps<bool>("wrapFade"), "Fade Distance", "", "fadeDistancePerc", 99, 1);
-
 
     extraPadding();
 
@@ -104,13 +108,18 @@ void DirectionHUD::settingsRender(float settingsOffset) {
 
     extraPadding();
 
+    addHeader("Waypoints");
+    addToggle("Show Waypoints", "", "showWaypoints");
+
+    extraPadding();
+
     addHeader("Degrees");
     addToggle("Show Degrees", "Display the exact angle (0-360)", "showDegrees");
-    addConditionalToggle(getOps<bool>("showDegrees"), "Degrees Symbol", "", "degreeSymbol");
-    addConditionalSlider(getOps<bool>("showDegrees"), "Degrees Decimal Count", "", "degreesDecimalCount", 5.0f, 0.0f, false);
+    addConditionalSliderInt(getOps<bool>("showDegrees"), "Degrees Decimal Count", "", "degreesDecimalCount", 5, 0);
     addConditionalSlider(getOps<bool>("showDegrees"), "Degrees Text Size", "", "degreesTextSize", 3.0f, 0.5f);
     addConditionalSlider(getOps<bool>("showDegrees"), "Degrees Text Offset", "", "degreesTextOffset", 10.0f, 0.0f, false);
     addConditionalToggle(getOps<bool>("showDegrees"), "Degrees Text Shadow", "", "degreesTextShadow");
+    addConditionalSlider(getOps<bool>("showDegrees") && getOps<bool>("degreesTextShadow"), "Degrees Text Shadow Offset", "", "degreesTextShadowOffset", 0.02f, 0.001f);
 
     extraPadding();
 
@@ -137,10 +146,22 @@ float DirectionHUD::calculateDeltaYaw(float currentYaw, float targetYaw) {
     return diff;
 }
 
+float DirectionHUD::normalizeYaw(float yaw) {
+    while (yaw <= -180.0f) yaw += 360.0f;
+    while (yaw > 180.0f) yaw -= 360.0f;
+    return yaw;
+}
+
+float DirectionHUD::getRelativeYaw(float playerX, float playerZ, float pointX, float pointZ, float playerYaw) {
+    float pointYaw = std::atan2(playerX - pointX, pointZ - playerZ) * (180.0f / 3.14f);
+    return normalizeYaw(pointYaw - playerYaw);
+}
+
 void DirectionHUD::onRender(RenderEvent &event) {
     if (!this->isEnabled()) return;
     if (!SDK::clientInstance || !SDK::clientInstance->getLocalPlayer()) return;
     if (SDK::getCurrentScreen() != "hud_screen") return;
+    if (getOps<bool>("hideWhenTabList") && ModuleManager::getModule("Tab List") != nullptr && ModuleManager::getModule("Tab List")->active) return;
 
     LocalPlayer* player = SDK::clientInstance->getLocalPlayer();
     ActorRotationComponent* rotationComponent = player->getActorRotationComponent();
@@ -185,9 +206,9 @@ void DirectionHUD::onRender(RenderEvent &event) {
 
     // handle editing in edit menu
     if (ClickGUI::editmenu) {
-        FlarialGUI::SetWindowRect(realcenter.x, realcenter.y, fullCirclePixelWidth, barHeight, 33);
+        FlarialGUI::SetWindowRect(realcenter.x, realcenter.y, fullCirclePixelWidth, barHeight, 34, this->name);
 
-        Vec2<float> vec2 = FlarialGUI::CalculateMovedXY(realcenter.x, realcenter.y, 33, fullCirclePixelWidth, barHeight);
+        Vec2<float> vec2 = FlarialGUI::CalculateMovedXY(realcenter.x, realcenter.y, 34, fullCirclePixelWidth, barHeight);
 
         checkForRightClickAndOpenSettings(realcenter.x, realcenter.y, fullCirclePixelWidth, barHeight);
 
@@ -230,6 +251,7 @@ void DirectionHUD::onRender(RenderEvent &event) {
     D2D_COLOR_F* cols[] = { &cardinalScaleCol, &ordinalScaleCol, &cardinalTextCol, &ordinalTextCol, &cardinalTextShadowCol, &ordinalTextShadowCol, &cardinalScaleShadowCol, &ordinalScaleShadowCol };
     std::vector<std::string> colStrings = { "cardinalScale", "ordinalScale", "cardinalText", "ordinalText", "cardinalTextShadow", "ordinalTextShadow", "cardinalScaleShadow", "ordinalScaleShadow" };
 
+
     // degrees text
     if (getOps<bool>("showDegrees")) {
         // convert to 0-360
@@ -237,8 +259,8 @@ void DirectionHUD::onRender(RenderEvent &event) {
         if (compassDegrees < 0) compassDegrees += 360.0f;
 
         std::stringstream ss;
-        ss << std::fixed << std::setprecision(floor(getOps<float>("degreesDecimalCount"))) << compassDegrees;
-        std::string degreesText = ss.str() + (getOps<bool>("degreeSymbol") ? "�" : "");
+        ss << std::fixed << std::setprecision(getOps<int>("degreesDecimalCount")) << compassDegrees;
+        std::string degreesText = ss.str();
 
         // get text size for positioning
         float degreesTextSize = Constraints::SpacingConstraint(5.f, barHeight) * getOps<float>("degreesTextSize");
@@ -251,8 +273,8 @@ void DirectionHUD::onRender(RenderEvent &event) {
         // shadow
         if (getOps<bool>("degreesTextShadow")) {
             FlarialGUI::FlarialTextWithFont(
-                hudCenterX + Constraints::RelativeConstraint(getOps<float>("textShadowOffset")) * uiscale,
-                realcenter.y + degreesTextOffset + Constraints::RelativeConstraint(getOps<float>("textShadowOffset")) * uiscale,
+                hudCenterX + Constraints::RelativeConstraint(getOps<float>("degreesTextShadowOffset")) * uiscale,
+                realcenter.y + degreesTextOffset + Constraints::RelativeConstraint(getOps<float>("degreesTextShadowOffset")) * uiscale,
                 FlarialGUI::to_wide(degreesText).c_str(),
                 0, 0,
                 DWRITE_TEXT_ALIGNMENT_CENTER, degreesTextSize,
@@ -314,6 +336,61 @@ void DirectionHUD::onRender(RenderEvent &event) {
                 );
             }
         }
+    }
+
+    if (getOps<bool>("showWaypoints")) {
+        std::shared_ptr<Waypoints> waypoints = std::dynamic_pointer_cast<Waypoints>(ModuleManager::getModule("Waypoints"));
+        if (waypoints) {
+            for (const auto& [name, wp] : waypoints->WaypointList) {
+                if (!waypoints->settings.getSettingByName<bool>("state-" + FlarialGUI::cached_to_string(wp.index))) continue;
+                if (waypoints->settings.getSettingByName<std::string>("world-" + FlarialGUI::cached_to_string(wp.index))->value != SDK::clientInstance->getLocalPlayer()->getLevel()->getWorldFolderName()) continue;
+                if (waypoints->settings.getSettingByName<std::string>("dimension-" + FlarialGUI::cached_to_string(wp.index))->value != SDK::clientInstance->getBlockSource()->getDimension()->getName()) continue;
+
+                Vec3<float> waypointPos = waypoints->getPos(wp.index);
+                Vec3<float> *playerPos = SDK::clientInstance->getLocalPlayer()->getPosition();
+
+                float relativeYaw = getRelativeYaw(playerPos->x, playerPos->z, waypointPos.x, waypointPos.z, lerpYaw);
+
+                float waypointX = hudCenterX + (relativeYaw * pixelsPerDegree);
+                if (waypointX > hudCenterX + fullCirclePixelWidth / 2.0f) waypointX -= fullCirclePixelWidth;
+                if (waypointX < hudCenterX - fullCirclePixelWidth / 2.0f) waypointX += fullCirclePixelWidth;
+
+                float waypointHeight = Constraints::RelativeConstraint(0.05f * uiscale);
+                float waypointWidth = Constraints::RelativeConstraint(0.005f * uiscale);
+
+                D2D_COLOR_F waypointCol = D2D1::ColorF(D2D1::ColorF::Red);
+                SettingType<std::string>* colSetting = waypoints->settings.getSettingByName<std::string>("color-" + FlarialGUI::cached_to_string(wp.index));
+                if (colSetting) waypointCol = FlarialGUI::HexToColorF(colSetting->value);
+
+                FlarialGUI::RoundedRect(
+                    floor(waypointX - waypointWidth / 2.f),
+                    realcenter.y,
+                    waypointCol,
+                    waypointWidth,
+                    waypointHeight,
+                    0, 0
+                );
+            }
+        }
+    }
+
+    for (int i = 0; i < yawSize; i++) {
+        int dirType;
+        if (i < 4) dirType = 0; // cardinal
+        else if (i > 3 && i < directions.size()) dirType = 1; // ordinal
+        else dirType = 2; // secondary intercardinal
+        float curX = xPos[i];
+        std::string curDir = i > 7 ? "" : directions[i];
+
+        for (int i = 0; i < colStrings.size(); i++) cols[i]->a = settings.getSettingByName<float>(colStrings[i] + "Opacity")->value;
+
+        if (getOps<bool>("wrapFade")) {
+            float distanceFromCenter = std::abs(curX - hudCenterX);
+            float maxDistance = fullCirclePixelWidth / 2;
+            float omittedDistance = maxDistance * getOps<float>("fadeDistancePerc") / 100;
+
+            if (distanceFromCenter > omittedDistance) for (size_t i = 0; i < colStrings.size(); i++) cols[i]->a = settings.getSettingByName<float>(colStrings[i] + "Opacity")->value * (1.f - (distanceFromCenter - omittedDistance) / (maxDistance - omittedDistance));
+        }
 
         if (getOps<bool>("showText") && curDir != "") {
             if ((dirType == 0 && getOps<bool>("showCardinalText")) ||
@@ -344,4 +421,5 @@ void DirectionHUD::onRender(RenderEvent &event) {
             }
         }
     }
+
 }

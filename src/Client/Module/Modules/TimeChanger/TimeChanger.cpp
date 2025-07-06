@@ -1,5 +1,5 @@
 #include "TimeChanger.hpp"
-
+#include "Client.hpp"
 #include "Events/EventManager.hpp"
 
 void TimeChanger::onEnable()
@@ -18,6 +18,7 @@ void TimeChanger::defaultConfig()
 {
     Module::defaultConfig("core");
     setDef("time", 0.5f);
+    
 }
 
 void TimeChanger::settingsRender(float settingsOffset)
@@ -43,5 +44,6 @@ void TimeChanger::settingsRender(float settingsOffset)
 
 void TimeChanger::onTimeEvent(TimeEvent& event)
 {
+    if (!this->isEnabled()) return;
     event.setTime(getOps<float>("time"));
 }

@@ -25,6 +25,7 @@
 using ::IUnknown;
 
 #include "../../../Module/Modules/MotionBlur/MotionBlur.hpp"
+#include "../../../../Assets/Assets.hpp"
 
 SwapchainHook::SwapchainHook() : Hook("swapchain_hook", 0) {}
 
@@ -139,11 +140,6 @@ void SwapchainHook::enableHook() {
     std::string gpuName = converter.to_bytes(gpuNameW);
     MC::GPU = gpuName;
     Logger::info("GPU name: {}", gpuName.c_str());
-    if (gpuName.contains("Intel") && Client::settings.getSettingByName<bool>("forceIntel")->value) {
-        queueReset = true;
-        Client::settings.getSettingByName<bool>("killdx")->value = true;
-    }
-    /* FORCE DX11 ON INTEL DEVICES */
 
 
     Memory::SafeRelease(pFactory);
@@ -190,7 +186,7 @@ HRESULT SwapchainHook::swapchainCallback(IDXGISwapChain3 *pSwapChain, UINT syncI
     UnderUIHooks::index = 0;
 
     if (D2D::context) MC::windowSize = Vec2(D2D::context->GetSize().width, D2D::context->GetSize().height);
-    
+
 
     /* UNDER UI HOOK - CLEARDEPTHSTENCILVIEW */
 
@@ -211,11 +207,15 @@ HRESULT SwapchainHook::swapchainCallback(IDXGISwapChain3 *pSwapChain, UINT syncI
 
         if (queue == nullptr) {
 
+
             DX11Init();
+
 
         } else {
 
+
             DX12Init();
+
 
         }
 
@@ -266,7 +266,7 @@ HRESULT SwapchainHook::swapchainCallback(IDXGISwapChain3 *pSwapChain, UINT syncI
 }
 
 void SwapchainHook::DX11Init() {
-    Logger::debug("Not a DX12 device, running DX11 procedures");
+    Logger::debug("Initializing for DX11");
 
     const D2D1_CREATION_PROPERTIES properties
             {
@@ -312,6 +312,8 @@ void SwapchainHook::DX11Init() {
 
 void SwapchainHook::DX12Init() {
 
+
+    Logger::debug("Initializing for DX12");
     ID3D12Device5 *device;
     swapchain->GetDevice(IID_PPV_ARGS(&d3d12Device5));
 
@@ -410,6 +412,8 @@ void SwapchainHook::DX11Render(bool underui) {
 
     SaveBackbuffer(underui);
 
+    if (!D2D::context) return;
+
     D2D::context->BeginDraw();
 
     ID3D11RenderTargetView *mainRenderTargetView = nullptr;
@@ -499,12 +503,13 @@ void SwapchainHook::DX12Render(bool underui) {
 
     ID3D11Resource *resource = D3D11Resources[currentBitmap];
     d3d11On12Device->AcquireWrappedResources(&resource, 1);
-
+    if (!D2D::context) return;
     SaveBackbuffer();
     D2D::context->SetTarget(D2D1Bitmaps[currentBitmap]);
     MC::windowSize = Vec2(D2D::context->GetSize().width, D2D::context->GetSize().height);
 
     DX12Blur();
+
 
     D2D::context->BeginDraw();
 
@@ -517,7 +522,7 @@ void SwapchainHook::DX12Render(bool underui) {
 
     D3D12_DESCRIPTOR_HEAP_DESC descriptorImGuiRender = {};
     descriptorImGuiRender.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    descriptorImGuiRender.NumDescriptors = buffersCounts;
+    descriptorImGuiRender.NumDescriptors = TOTAL_CONSOLIDATED_DESCRIPTORS; // Consolidated heap for ImGui + Images
     descriptorImGuiRender.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 
     if (d3d12DescriptorHeapImGuiRender or SUCCEEDED(d3d12Device5->CreateDescriptorHeap(&descriptorImGuiRender,
@@ -567,10 +572,45 @@ void SwapchainHook::DX12Render(bool underui) {
 
                     ImGui_ImplWin32_Init(window2);
 
-                    ImGui_ImplDX12_Init(d3d12Device5, buffersCounts,
-                                        DXGI_FORMAT_R8G8B8A8_UNORM, d3d12DescriptorHeapImGuiRender,
-                                        d3d12DescriptorHeapImGuiRender->GetCPUDescriptorHandleForHeapStart(),
-                                        d3d12DescriptorHeapImGuiRender->GetGPUDescriptorHandleForHeapStart());
+                    // Set up modern ImGui D3D12 initialization with consolidated descriptor heap
+                    ImGui_ImplDX12_InitInfo init_info = {};
+                    init_info.Device = d3d12Device5;
+                    init_info.CommandQueue = queue;
+                    init_info.NumFramesInFlight = buffersCounts;
+                    init_info.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+                    init_info.DSVFormat = DXGI_FORMAT_UNKNOWN;
+                    init_info.SrvDescriptorHeap = d3d12DescriptorHeapImGuiRender;
+                    
+                    // Set up descriptor allocation callbacks for consolidated heap
+                    init_info.SrvDescriptorAllocFn = [](ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle) {
+                        std::lock_guard<std::mutex> lock(descriptorAllocationMutex);
+                        
+                        // ImGui font descriptor is always allocated at index 0 (reserved)
+                        UINT fontDescriptorIndex = 0;
+                        UINT handle_increment = d3d12Device5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+                        
+                        D3D12_CPU_DESCRIPTOR_HANDLE cpu = d3d12DescriptorHeapImGuiRender->GetCPUDescriptorHandleForHeapStart();
+                        cpu.ptr += (handle_increment * fontDescriptorIndex);
+                        
+                        D3D12_GPU_DESCRIPTOR_HANDLE gpu = d3d12DescriptorHeapImGuiRender->GetGPUDescriptorHandleForHeapStart();
+                        gpu.ptr += (handle_increment * fontDescriptorIndex);
+                        
+                        *out_cpu_handle = cpu;
+                        *out_gpu_handle = gpu;
+                        
+                        Logger::custom(fg(fmt::color::green), "DescriptorAlloc", "Allocated ImGui font descriptor at reserved index {}", fontDescriptorIndex);
+                    };
+                    
+                    init_info.SrvDescriptorFreeFn = [](ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle) {
+                        // ImGui font descriptor is persistent, no need to free
+                        Logger::custom(fg(fmt::color::cyan), "DescriptorFree", "ImGui font descriptor freed (no-op)");
+                    };
+
+                    if (!ImGui_ImplDX12_Init(&init_info)) {
+                        Logger::custom(fg(fmt::color::red), "ImGui", "ERROR: Failed to initialize ImGui DX12 backend with consolidated heap");
+                    } else {
+                        Logger::custom(fg(fmt::color::green), "ImGui", "ImGui DX12 backend initialized successfully with consolidated heap");
+                    }
                 }
 
                 ImGui_ImplDX12_NewFrame();
@@ -633,7 +673,16 @@ void SwapchainHook::DX12Render(bool underui) {
                 d3d12CommandList->OMSetRenderTargets(1,
                                                      &frameContexts[currentBitmap].main_render_target_descriptor,
                                                      FALSE, nullptr);
+                // Bind consolidated descriptor heap (contains both ImGui and image descriptors)
                 d3d12CommandList->SetDescriptorHeaps(1, &d3d12DescriptorHeapImGuiRender);
+                
+                static bool loggedOnce = false;
+                if (!loggedOnce) {
+                    loggedOnce = true;
+                    Logger::custom(fg(fmt::color::green), "D3D12Render", "Using consolidated descriptor heap for Intel GPU compatibility");
+                    Logger::custom(fg(fmt::color::cyan), "D3D12Render", "Consolidated heap: 0x{:X}, Total descriptors: {}", 
+                                   reinterpret_cast<uintptr_t>(d3d12DescriptorHeapImGuiRender), TOTAL_CONSOLIDATED_DESCRIPTORS);
+                }
 
                 ImGui::End();
                 ImGui::EndFrame();
@@ -737,44 +786,47 @@ void SwapchainHook::prepareBlur() {
 void SwapchainHook::Fonts() {
     /* IMPORTANT FONT STUFF */
     if (ImGui::GetCurrentContext()) {
+        static bool fontRebuildQueued = false;
 
         if (FlarialGUI::DoLoadFontLater) {
-
             FontKey fontK = FlarialGUI::LoadFontLater;
-            if (Client::settings.getSettingByName<bool>("overrideFontWeight")->value) fontK.weight = FlarialGUI::GetFontWeightFromString(Client::settings.getSettingByName<std::string>("fontWeight")->value);
-                if (!FlarialGUI::FontMap[fontK]) {
-                    FlarialGUI::LoadFontFromFontFamily(fontK);
-                }
+            if (Client::settings.getSettingByName<bool>("overrideFontWeight")->value) {
+                fontK.weight = FlarialGUI::GetFontWeightFromString(Client::settings.getSettingByName<std::string>("fontWeight")->value);
+            }
+            
+            if (!FlarialGUI::FontMap[fontK]) {
+                FlarialGUI::LoadFontFromFontFamily(fontK);
+            }
             FlarialGUI::DoLoadFontLater = false;
-
         }
-
-        //std::cout << FlarialGUI::WideToNarrow(FlarialGUI::GetFontFilePath(L"Dosis", DWRITE_FONT_WEIGHT_EXTRA_BLACK)).c_str() << std::endl;
-        /*
-        if(!allfontloaded) {
-            FlarialGUI::LoadFonts(FlarialGUI::FontMap);
-
-            allfontloaded = true;
-        }
-        */
 
         auto& io = ImGui::GetIO();
 
+        // Batch font operations to reduce expensive device object recreation
         if (FlarialGUI::HasAFontLoaded) {
-            io.Fonts->Build();
-            if (!queue) {
-                ImGui_ImplDX11_InvalidateDeviceObjects();
-                ImGui_ImplDX11_CreateDeviceObjects();
-            }
-            else {
-                ImGui_ImplDX12_InvalidateDeviceObjects();
-                ImGui_ImplDX12_CreateDeviceObjects();
-            }
-
+            fontRebuildQueued = true;
             FlarialGUI::HasAFontLoaded = false;
         }
-    }
 
+        // Only rebuild when actually needed and defer expensive operations
+        if (fontRebuildQueued) {
+            io.Fonts->Build();
+            
+            // Use a static frame counter to defer expensive device object recreation
+            static int frameDelay = 0;
+            if (++frameDelay >= 3) { // Wait 3 frames to batch multiple font loads
+                if (!queue) {
+                    ImGui_ImplDX11_InvalidateDeviceObjects();
+                    ImGui_ImplDX11_CreateDeviceObjects();
+                } else {
+                    ImGui_ImplDX12_InvalidateDeviceObjects();
+                    ImGui_ImplDX12_CreateDeviceObjects();
+                }
+                fontRebuildQueued = false;
+                frameDelay = 0;
+            }
+        }
+    }
     /* IMPORTANT FONT STUFF */
 }
 void SwapchainHook::FPSMeasure() {
@@ -850,4 +902,212 @@ void SwapchainHook::SaveBackbuffer(bool underui) {
         hr = D3D11Resources[currentBitmap]->QueryInterface(IID_PPV_ARGS(&SavedD3D11BackBuffer));
         if (FAILED(hr)) std::cout << "Failed to query interface: " << std::hex << hr << std::endl;
     }
+}
+
+// Consolidated descriptor heap management functions
+bool SwapchainHook::AllocateImageDescriptor(UINT imageId, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle) {
+    std::lock_guard<std::mutex> lock(descriptorAllocationMutex);
+    
+    if (!d3d12DescriptorHeapImGuiRender || !d3d12Device5) {
+        Logger::custom(fg(fmt::color::red), "DescriptorAlloc", "ERROR: Consolidated descriptor heap or device not available");
+        return false;
+    }
+    
+    // Calculate descriptor index for this image (imageId - 100 + IMGUI_FONT_DESCRIPTORS)
+    UINT descriptorIndex = (imageId - 100) + IMGUI_FONT_DESCRIPTORS;
+    
+    if (descriptorIndex >= TOTAL_CONSOLIDATED_DESCRIPTORS) {
+        Logger::custom(fg(fmt::color::red), "DescriptorAlloc", "ERROR: Image ID {} would exceed descriptor heap capacity (index {} >= {})", 
+                       imageId, descriptorIndex, TOTAL_CONSOLIDATED_DESCRIPTORS);
+        return false;
+    }
+    
+    UINT handle_increment = d3d12Device5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    
+    D3D12_CPU_DESCRIPTOR_HANDLE cpu = d3d12DescriptorHeapImGuiRender->GetCPUDescriptorHandleForHeapStart();
+    cpu.ptr += (handle_increment * descriptorIndex);
+    
+    D3D12_GPU_DESCRIPTOR_HANDLE gpu = d3d12DescriptorHeapImGuiRender->GetGPUDescriptorHandleForHeapStart();
+    gpu.ptr += (handle_increment * descriptorIndex);
+    
+    *out_cpu_handle = cpu;
+    *out_gpu_handle = gpu;
+    
+    // Update next available index if this is beyond current usage
+    if (descriptorIndex >= nextAvailableDescriptorIndex) {
+        nextAvailableDescriptorIndex = descriptorIndex + 1;
+    }
+    
+
+    return true;
+}
+
+void SwapchainHook::FreeImageDescriptor(UINT imageId) {
+    std::lock_guard<std::mutex> lock(descriptorAllocationMutex);
+    
+    // For now, we don't actually free descriptors as images are persistent
+    // This could be enhanced later with proper free list management
+    Logger::custom(fg(fmt::color::cyan), "DescriptorFree", "Freed descriptor for image ID {} (no-op for persistent images)", imageId);
+}
+
+void SwapchainHook::ResetDescriptorAllocation() {
+    std::lock_guard<std::mutex> lock(descriptorAllocationMutex);
+    
+    nextAvailableDescriptorIndex = IMGUI_FONT_DESCRIPTORS; // Reset to start after ImGui font
+    Logger::custom(fg(fmt::color::yellow), "DescriptorAlloc", "Reset descriptor allocation, next available index: {}", nextAvailableDescriptorIndex);
+}
+
+// PlayerHead Descriptor Management Functions
+
+bool SwapchainHook::AllocatePlayerHeadDescriptor(const std::string& playerName, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle, UINT* out_descriptor_id) {
+    std::lock_guard<std::mutex> lock(playerHeadDescriptorMutex);
+    
+    if (!d3d12DescriptorHeapImGuiRender || !d3d12Device5) {
+        Logger::custom(fg(fmt::color::red), "PlayerHeadDescriptor", "ERROR: Descriptor heap or device not available");
+        return false;
+    }
+    
+    // Check if we already have a descriptor for this player
+    for (auto& [descriptorId, info] : playerHeadDescriptors) {
+        if (info.playerName == playerName && info.inUse) {
+            info.lastUsed = std::chrono::steady_clock::now();
+            
+            // Calculate descriptor handles - convert playerhead ID to heap index
+            UINT heapIndex = descriptorId - PLAYERHEAD_DESCRIPTOR_START + IMGUI_FONT_DESCRIPTORS + MAX_IMAGE_DESCRIPTORS;
+            
+            UINT handle_increment = d3d12Device5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            
+            D3D12_CPU_DESCRIPTOR_HANDLE cpu = d3d12DescriptorHeapImGuiRender->GetCPUDescriptorHandleForHeapStart();
+            cpu.ptr += (handle_increment * heapIndex);
+            
+            D3D12_GPU_DESCRIPTOR_HANDLE gpu = d3d12DescriptorHeapImGuiRender->GetGPUDescriptorHandleForHeapStart();
+            gpu.ptr += (handle_increment * heapIndex);
+            
+            *out_cpu_handle = cpu;
+            *out_gpu_handle = gpu;
+            *out_descriptor_id = descriptorId;
+            
+            Logger::custom(fg(fmt::color::green), "PlayerHeadDescriptor", "Reusing descriptor {} (heap index {}) for player '{}'", descriptorId, heapIndex, playerName);
+            return true;
+        }
+    }
+    
+    UINT descriptorId;
+    
+    // Try to reuse a freed descriptor first
+    if (!freePlayerHeadDescriptors.empty()) {
+        descriptorId = freePlayerHeadDescriptors.front();
+        freePlayerHeadDescriptors.pop();
+        Logger::custom(fg(fmt::color::cyan), "PlayerHeadDescriptor", "Reusing freed descriptor {} for player '{}'", descriptorId, playerName);
+    } else {
+        // Allocate new descriptor
+        static bool initialized = false;
+        if (!initialized) {
+            nextPlayerHeadDescriptorId = PLAYERHEAD_DESCRIPTOR_START;
+            initialized = true;
+        }
+        
+        if (nextPlayerHeadDescriptorId >= PLAYERHEAD_DESCRIPTOR_END) {
+            Logger::custom(fg(fmt::color::red), "PlayerHeadDescriptor", "ERROR: No more playerhead descriptors available (reached limit of {})", MAX_PLAYERHEAD_DESCRIPTORS);
+            return false;
+        }
+        
+        descriptorId = nextPlayerHeadDescriptorId++;
+        Logger::custom(fg(fmt::color::blue), "PlayerHeadDescriptor", "Allocating new descriptor {} for player '{}'", descriptorId, playerName);
+    }
+    
+    // Calculate descriptor handles - convert playerhead ID to heap index
+    UINT heapIndex = descriptorId - PLAYERHEAD_DESCRIPTOR_START + IMGUI_FONT_DESCRIPTORS + MAX_IMAGE_DESCRIPTORS;
+    
+    if (heapIndex >= TOTAL_CONSOLIDATED_DESCRIPTORS) {
+        Logger::custom(fg(fmt::color::red), "PlayerHeadDescriptor", "ERROR: Calculated heap index {} exceeds total descriptors {} (descriptor ID {})", heapIndex, TOTAL_CONSOLIDATED_DESCRIPTORS, descriptorId);
+        return false;
+    }
+    
+    Logger::custom(fg(fmt::color::cyan), "PlayerHeadDescriptor", "Using descriptor {} -> heap index {} for player '{}'", descriptorId, heapIndex, playerName);
+    
+    UINT handle_increment = d3d12Device5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    
+    D3D12_CPU_DESCRIPTOR_HANDLE cpu = d3d12DescriptorHeapImGuiRender->GetCPUDescriptorHandleForHeapStart();
+    cpu.ptr += (handle_increment * heapIndex);
+    
+    D3D12_GPU_DESCRIPTOR_HANDLE gpu = d3d12DescriptorHeapImGuiRender->GetGPUDescriptorHandleForHeapStart();
+    gpu.ptr += (handle_increment * heapIndex);
+    
+    // Store descriptor info
+    playerHeadDescriptors[descriptorId] = {
+        playerName,
+        std::chrono::steady_clock::now(),
+        true
+    };
+    
+    *out_cpu_handle = cpu;
+    *out_gpu_handle = gpu;
+    *out_descriptor_id = descriptorId;
+    
+    return true;
+}
+
+void SwapchainHook::FreePlayerHeadDescriptor(UINT descriptorId) {
+    std::lock_guard<std::mutex> lock(playerHeadDescriptorMutex);
+    
+    auto it = playerHeadDescriptors.find(descriptorId);
+    if (it != playerHeadDescriptors.end()) {
+        Logger::custom(fg(fmt::color::yellow), "PlayerHeadDescriptor", "Freeing descriptor {} for player '{}'", descriptorId, it->second.playerName);
+        it->second.inUse = false;
+        freePlayerHeadDescriptors.push(descriptorId);
+        playerHeadDescriptors.erase(it);
+    }
+}
+
+void SwapchainHook::CleanupOldPlayerHeads(size_t maxCached) {
+    std::lock_guard<std::mutex> lock(playerHeadDescriptorMutex);
+    
+    if (playerHeadDescriptors.size() <= maxCached) {
+        return; // No need to cleanup
+    }
+    
+    // Collect descriptors sorted by last used time
+    std::vector<std::pair<UINT, std::chrono::steady_clock::time_point>> descriptorAges;
+    for (const auto& [descriptorId, info] : playerHeadDescriptors) {
+        if (info.inUse) {
+            descriptorAges.emplace_back(descriptorId, info.lastUsed);
+        }
+    }
+    
+    // Sort by oldest first
+    std::sort(descriptorAges.begin(), descriptorAges.end(),
+        [](const auto& a, const auto& b) {
+            return a.second < b.second;
+        });
+    
+    // Free oldest descriptors to get under the limit
+    size_t toRemove = playerHeadDescriptors.size() - maxCached;
+    size_t removed = 0;
+    
+    for (const auto& [descriptorId, _] : descriptorAges) {
+        if (removed >= toRemove) break;
+        
+        auto it = playerHeadDescriptors.find(descriptorId);
+        if (it != playerHeadDescriptors.end()) {
+            Logger::custom(fg(fmt::color::orange), "PlayerHeadDescriptor", "Cleaning up old descriptor {} for player '{}'", descriptorId, it->second.playerName);
+            freePlayerHeadDescriptors.push(descriptorId);
+            playerHeadDescriptors.erase(it);
+            removed++;
+        }
+    }
+    
+    Logger::custom(fg(fmt::color::green), "PlayerHeadDescriptor", "Cleaned up {} old playerhead descriptors, {} remaining", removed, playerHeadDescriptors.size());
+}
+
+void SwapchainHook::ResetPlayerHeadDescriptors() {
+    std::lock_guard<std::mutex> lock(playerHeadDescriptorMutex);
+    
+    playerHeadDescriptors.clear();
+    while (!freePlayerHeadDescriptors.empty()) {
+        freePlayerHeadDescriptors.pop();
+    }
+    nextPlayerHeadDescriptorId = PLAYERHEAD_DESCRIPTOR_START;
+    
+    Logger::custom(fg(fmt::color::cyan), "PlayerHeadDescriptor", "Reset all playerhead descriptors");
 }

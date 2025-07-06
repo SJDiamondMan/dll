@@ -50,6 +50,7 @@ int JavaInventoryHotkeys::isSlotKeybind(std::string key) {
 }
 
 void JavaInventoryHotkeys::onMouseInput(MouseEvent &event) {
+    if (!this->isEnabled()) return;
     if (event.getAction() != MouseAction::Press) return;
     std::string screen = SDK::getCurrentScreen();
     if (screen == "hud_screen" || screen == "pause_screen") return;
@@ -61,11 +62,10 @@ void JavaInventoryHotkeys::onMouseInput(MouseEvent &event) {
 }
 
 void JavaInventoryHotkeys::onKey(KeyEvent &event) {
+    if (!this->isEnabled()) return;
     std::string screen = SDK::getCurrentScreen();
-    if (screen == "hud_screen" || screen == "pause_screen") {
-        clearQueue();
-    }
-    if (screen != "inventory_screen") return;
+    if (screen == "hud_screen" || screen == "pause_screen") clearQueue();
+    
     if (event.getAction() != ActionType::Pressed) return;
 
     auto targetSlot = isSlotKeybind(FlarialGUI::cached_to_string(event.getKey()));
@@ -75,11 +75,13 @@ void JavaInventoryHotkeys::onKey(KeyEvent &event) {
 }
 
 void JavaInventoryHotkeys::onContainerSlotHovered(ContainerSlotHoveredEvent &event) {
+    if (!this->isEnabled()) return;
     currentHoveredSlot = event.getHoveredSlot();
     currentCollectionName = event.getCollectionName();
 }
 
 void JavaInventoryHotkeys::onContainerTick(ContainerScreenControllerTickEvent &event) {
+    if (!this->isEnabled()) return;
     auto controller = event.getContainerScreenController();
     if (!controller) return;
     if (lastContainer != controller) {

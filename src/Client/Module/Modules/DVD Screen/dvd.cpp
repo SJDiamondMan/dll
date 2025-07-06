@@ -1,5 +1,5 @@
 #include "dvd.hpp"
-
+#include "Client.hpp"
 #include "Events/EventManager.hpp"
 
 void DVD::onEnable() {
@@ -17,6 +17,7 @@ void DVD::defaultConfig() {
     setDef("xveloc", 1.0f);
     setDef("yveloc", 0.69f);
     setDef("scale", 1.0f);
+    
 }
 
 void DVD::settingsRender(float settingsOffset) {

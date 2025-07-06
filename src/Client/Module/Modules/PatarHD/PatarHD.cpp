@@ -4,7 +4,7 @@
 
 PatarHD::PatarHD(): Module("PatarHD", "At this Point it should be called Staff Mod", IDR_SKULL_PNG, "")
 {
-    Module::setup();
+    
 }
 
 void PatarHD::onEnable()
@@ -28,6 +28,7 @@ void PatarHD::defaultConfig()
     setDef("yveloc", 0.69f);
     setDef("scale", 1.0f);
     setDef("mode", (std::string)"Patar");
+    
 }
 
 void PatarHD::settingsRender(float settingsOffset)
@@ -56,6 +57,7 @@ void PatarHD::settingsRender(float settingsOffset)
 
 void PatarHD::onRender(RenderEvent& event)
 {
+    if (!this->isEnabled()) return;
     if (SDK::currentScreen != "hud_screen") return;
     float s = Constraints::RelativeConstraint(0.35, "height", true) * getOps<float>("scale");
     int draw = 165;

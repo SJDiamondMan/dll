@@ -9,12 +9,11 @@
 class DirectionHUD : public Module {
 public:
 	float lerpYaw = 0.f;
-	float yaw = 0.f;
 
 
 	DirectionHUD() : Module("DirectionHUD", "Shows a compass showing your direction",
 		IDR_CURSOR_PNG, "") {
-		Module::setup();
+		
 	};
 
 	void onEnable() override;
@@ -27,6 +26,10 @@ public:
 
 	// minecraft yaw goes from -180 to 180 
 	float calculateDeltaYaw(float currentYaw, float targetYaw);
+
+	float normalizeYaw(float yaw);
+
+	float getRelativeYaw(float playerX, float playerZ, float pointX, float pointZ, float playerYaw);
 
 	float targetYaws[8 + 16] = {
 		180.f, // N

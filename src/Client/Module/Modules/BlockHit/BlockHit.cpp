@@ -16,11 +16,11 @@ void BlockHit::onDisable() {
 }
 
 void BlockHit::onItemInHandRender(RenderItemInHandEvent &event) {
-
+    if (!this->isEnabled()) return;
     auto& matrix = SDK::clientInstance->getCamera().getWorldMatrixStack().top().matrix;
     auto itemStack = event.itemStack;
 
-    if (itemStack->item.get() != nullptr && CPSCounter::GetRightHeld() && itemStack->getItem()->name.contains("sword")) {
+    if (itemStack->item.get() != nullptr && MC::heldRight && itemStack->getItem()->name.contains("sword")) {
 
         switch (perspective) {
             case Perspective::FirstPerson:
@@ -55,8 +55,10 @@ void BlockHit::onItemInHandRender(RenderItemInHandEvent &event) {
 
 void BlockHit::defaultConfig() {
     Module::defaultConfig("core");
+    
 }
 
 void BlockHit::onPerspectiveChange(PerspectiveEvent &event)  {
+    if (!this->isEnabled()) return;
     this->perspective = event.getPerspective();
 }

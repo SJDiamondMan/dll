@@ -39,6 +39,7 @@ std::map<int, ID2D1Bitmap*> ImagesClass::images;
 
 std::map<int, ID3D11ShaderResourceView*> ImagesClass::ImguiDX11Images;
 std::map<int, ImTextureID> ImagesClass::ImguiDX12Images;
+std::map<int, ID3D12Resource*> ImagesClass::ImguiDX12Textures;
 
 // TODO: release it !!!
 ID2D1Factory* FlarialGUI::factory;
@@ -64,10 +65,14 @@ LRUCache<uint64_t, winrt::com_ptr<ID2D1LinearGradientBrush>> FlarialGUI::gradien
 
 std::unordered_map<int, WindowRect> FlarialGUI::WindowRects;
 std::unordered_map<int, SliderRect> FlarialGUI::SliderRects;
+std::unordered_map<int, SliderIntRect> FlarialGUI::SliderIntRects;
 std::unordered_map<int, TextBoxStruct> FlarialGUI::TextBoxes;
 std::unordered_map<int, ColorPicker> FlarialGUI::ColorPickers;
 std::unordered_map<int, DropdownStruct> FlarialGUI::DropDownMenus;
 std::unordered_map<int, KeybindSelector> FlarialGUI::KeybindSelectors;
+std::unordered_map<int, bool> FlarialGUI::ToggleIsHovering;
+std::unordered_map<int, bool> FlarialGUI::buttonsHovered;
+std::unordered_map<int, bool> FlarialGUI::radioButtonsHovered;
 
 void FlarialGUI::OverrideAlphaValues(float percent) {
 	//FlarialGUI::lerp()
@@ -522,7 +527,7 @@ std::string FlarialGUI::ColorFToHex(const D2D1_COLOR_F& color) {
 
 void FlarialGUI::FlarialText(float x, float y, const wchar_t* text, float width, const float height,
 	const DWRITE_TEXT_ALIGNMENT alignment) {
-	D2D1_COLOR_F color = clickgui->getColor("globalText", "ClickGUI");
+	D2D1_COLOR_F color = ClickGUI::getColor("globalText");
 
 	if (isInScrollView) y += scrollpos;
 
@@ -637,12 +642,16 @@ ImVec2 FlarialGUI::getFlarialTextSize(const wchar_t* text, const float width, co
 	const DWRITE_TEXT_ALIGNMENT alignment, const float fontSize,
 	const DWRITE_FONT_WEIGHT weight, bool moduleFont, bool troll) {
 
+	bool pixelate = Client::settings.getSettingByName<bool>("pixelateFonts")->value;
+
 	std::string font = Client::settings.getSettingByName<std::string>(moduleFont ? "mod_fontname" : "fontname")->value;
 
 	const std::vector<int> fontSizeBuckets = { 16, 32, 64, 128, 256 };
 	float guiScale = Client::settings.getSettingByName<float>(moduleFont ? "modules_font_scale" : "gui_font_scale")->value;
 	float targetFontSize = (fontSize * guiScale) * 0.18f;
 	int baseFontSize = fontSizeBuckets.back();
+
+	if (pixelate && targetFontSize > 1.f) targetFontSize = floor(targetFontSize);
 
 	float scaleFactor = targetFontSize / static_cast<float>(baseFontSize);
 
@@ -670,6 +679,12 @@ ImVec2 FlarialGUI::getFlarialTextSize(const wchar_t* text, const float width, co
 	if (!FontMap[fontK]) return ImVec2{ 0, 0 };
 	if (FontMap[fontK]->Scale <= 0.0f || !FontMap[fontK]->IsLoaded()) return ImVec2{ 0, 0 };
 
+	ImGuiStyle& style = ImGui::GetStyle();
+	if (pixelate) {
+		style.AntiAliasedLines = false; // Default is true
+		style.AntiAliasedFill = false;  // Default is true
+	}
+
 	ImGui::PushFont(FontMap[fontK]);
 	ImGui::SetWindowFontScale(scaleFactor);
 
@@ -679,6 +694,11 @@ ImVec2 FlarialGUI::getFlarialTextSize(const wchar_t* text, const float width, co
 	ImGui::SetWindowFontScale(1.0);
 	ImGui::PopFont();
 
+	if (pixelate) {
+		style.AntiAliasedLines = true; // Default is true
+		style.AntiAliasedFill = true;  // Default is true
+	}
+
 	return size;
 }
 
@@ -686,7 +706,7 @@ std::string FlarialGUI::FlarialTextWithFont(float x, float y, const wchar_t* tex
 	const DWRITE_TEXT_ALIGNMENT alignment, const float fontSize,
 	const DWRITE_FONT_WEIGHT weight, bool moduleFont, bool troll) {
 
-	D2D1_COLOR_F color = clickgui->getColor("globalText", "ClickGUI");
+	D2D1_COLOR_F color = ClickGUI::getColor("globalText");
 	color.a *= clickgui->settings.getSettingByName<float>("_overrideAlphaValues_")->value;
 
 	if (FlarialGUI::inMenu && !troll && ClickGUI::settingsOpacity != 1 && ClickGUI::curr != "modules" && !ClickGUI::editmenu) color.a = ClickGUI::settingsOpacity;
@@ -699,6 +719,8 @@ std::string FlarialGUI::FlarialTextWithFont(float x, float y, const wchar_t* tex
 std::string FlarialGUI::FlarialTextWithFont(float x, float y, const wchar_t* text, const float width, const float height,
 	const DWRITE_TEXT_ALIGNMENT alignment, const float fontSize,
 	const DWRITE_FONT_WEIGHT weight, D2D1_COLOR_F color, bool moduleFont) {
+
+	bool pixelate = Client::settings.getSettingByName<bool>("pixelateFonts")->value;
 
 	if (isInScrollView) y += scrollpos;
 	if (shouldAdditionalY) {
@@ -716,6 +738,8 @@ std::string FlarialGUI::FlarialTextWithFont(float x, float y, const wchar_t* tex
 
 	float guiScale = Client::settings.getSettingByName<float>(moduleFont ? "modules_font_scale" : "gui_font_scale")->value;
 	float targetFontSize = (fontSize * guiScale) * 0.18f;
+
+	if (pixelate && targetFontSize > 1.f) targetFontSize = floor(targetFontSize);
 
 	const std::vector<int> fontSizeBuckets = { 16, 32, 64, 128, 256 };
 
@@ -753,6 +777,12 @@ std::string FlarialGUI::FlarialTextWithFont(float x, float y, const wchar_t* tex
 	if (!FontMap[fontK]) return "";
 	if (FontMap[fontK]->Scale <= 0.0f || !FontMap[fontK]->IsLoaded()) return "";
 
+	ImGuiStyle& style = ImGui::GetStyle();
+	if (pixelate) {
+		style.AntiAliasedLines = false; // Default is true
+		style.AntiAliasedFill = false;  // Default is true
+	}
+	
 	ImGui::PushFont(FontMap[fontK]);
 	ImGui::SetWindowFontScale(scaleFactor);
 
@@ -778,11 +808,16 @@ std::string FlarialGUI::FlarialTextWithFont(float x, float y, const wchar_t* tex
 	TextSizesXY[fontedName] = Vec2<float>(size.x, size.y);
 	y += (height / 2) - (size.y / 2);
 
-	ImGui::GetBackgroundDrawList()->AddText(ImVec2(x, y), ImColor(color.r, color.g, color.b, color.a), stringText.c_str());
+	ImGui::GetBackgroundDrawList()->AddText(ImVec2(pixelate ? floor(x) : x, pixelate ? floor(y) : y), ImColor(color.r, color.g, color.b, color.a), stringText.c_str());
 
 	ImGui::SetWindowFontScale(1.0);
 	ImGui::PopFont();
 
+	if (pixelate) {
+		style.AntiAliasedLines = true; // Default is true
+		style.AntiAliasedFill = true;  // Default is true
+	}
+	
 	return fontedName;
 }
 
@@ -991,7 +1026,12 @@ bool FlarialGUI::LoadFontFromFontFamily(FontKey fontK) {
 			{
 
 				ImFontConfig config;
-				config.FontBuilderFlags = ImGuiFreeTypeBuilderFlags_MonoHinting;
+				if (Client::settings.getSettingByName<bool>("pixelateFonts")->value) {
+					config.FontBuilderFlags = ImGuiFreeTypeBuilderFlags_Monochrome;
+					config.OversampleH = 1;
+					config.OversampleV = 1;
+				} else config.FontBuilderFlags = ImGuiFreeTypeBuilderFlags_MonoHinting;
+
 				config.FontDataOwnedByAtlas = false;
 				int FontDataSize = static_cast<int>(it->first.size());
 
@@ -1157,7 +1197,9 @@ void FlarialGUI::UnsetScrollView() {
 	D2D::context->PopAxisAlignedClip();
 }
 
-void FlarialGUI::SetWindowRect(float x, float y, float width, float height, int currentNum, float fixer) {
+void FlarialGUI::SetWindowRect(float x, float y, float width, float height, int currentNum, std::string modname) {
+	if (MC::mouseButton == MouseButton::Right) return;
+	float fixer = 0;
 	isInWindowRect = true;
 
 	D2D1_COLOR_F c = D2D1::ColorF(D2D1::ColorF::White);
@@ -1165,6 +1207,7 @@ void FlarialGUI::SetWindowRect(float x, float y, float width, float height, int 
 	FlarialGUI::RoundedRect(x, y, c, width, height, 0, 0);
 	c.a = 1.f;
 	FlarialGUI::RoundedHollowRect(x, y, Constraints::RelativeConstraint(0.003f, "height", true), c, width, height, 0, 0);
+	FlarialGUI::FlarialTextWithFont(x, y + 0.005f * MC::windowSize.y, FlarialGUI::to_wide(modname).c_str(), 0, 0, DWRITE_TEXT_ALIGNMENT_LEADING, Constraints::RelativeConstraint(0.1f, "height", true), DWRITE_FONT_WEIGHT_NORMAL, false);
 
 	if (currentNum > maxRect) maxRect = currentNum;
 
@@ -1179,6 +1222,15 @@ void FlarialGUI::SetWindowRect(float x, float y, float width, float height, int 
 
 	WindowRects[currentNum].width = width;
 	WindowRects[currentNum].height = height;
+
+	if (CursorInRect(x, y + (isInScrollView ? scrollpos : 0), width, height) && !WindowRects[currentNum].isHovering) {
+		WindowRects[currentNum].isHovering = true;
+		WinrtUtils::setCursorTypeThreaded(winrt::Windows::UI::Core::CoreCursorType::SizeAll);
+	}
+	else if (!CursorInRect(x, y + (isInScrollView ? scrollpos : 0), width, height) && WindowRects[currentNum].isHovering) {
+		WindowRects[currentNum].isHovering = false;
+		WinrtUtils::setCursorTypeThreaded(winrt::Windows::UI::Core::CoreCursorType::Arrow);
+	}
 
 	if (!ye) {
 		if ((CursorInRect(x, y, width, height) || WindowRects[currentNum].isMovingElement) && MC::held) {
@@ -1218,7 +1270,7 @@ void FlarialGUI::SetWindowRect(float x, float y, float width, float height, int 
 	WindowRects[currentNum].percentageX = WindowRects[currentNum].movedX / MC::windowSize.x;
 	WindowRects[currentNum].percentageY = WindowRects[currentNum].movedY / MC::windowSize.y;
 
-	if (WindowRects[currentNum].isMovingElement && Client::settings.getSettingByName<bool>("snappinglines")->value) {
+	if (WindowRects[currentNum].isMovingElement && Client::settings.getSettingByName<bool>("snappinglines")->value && !MC::holdingCTRL) {
 		const float alignmentThreshold = 10.0f;
 		const ImColor pink(1.0f, 0.0f, 1.0f, 1.0f);
 
@@ -1410,20 +1462,21 @@ void FlarialGUI::ImRotateEnd(float angle, ImVec2 center)
 std::vector<D2D_RECT_F> PreviousClippingRects = {};
 
 void FlarialGUI::PushImClipRect(ImVec2 pos, ImVec2 size, bool overridePreviousClipping) {
+
+	ImVec2 max(pos.x + size.x, pos.y + size.y);
+
     if (!overridePreviousClipping and !PreviousClippingRects.empty())
     {
         ImVec2 ClippedPos(PreviousClippingRects.back().left, PreviousClippingRects.back().top);
-        ImVec2 ClippedSize(PreviousClippingRects.back().right - PreviousClippingRects.back().left, PreviousClippingRects.back().bottom - PreviousClippingRects.back().top);
+        ImVec2 ClippedSize(PreviousClippingRects.back().right, PreviousClippingRects.back().bottom);
 
         if (ClippedPos.x >= pos.x) pos.x = ClippedPos.x + 1;
         if (ClippedPos.y >= pos.y) pos.y = ClippedPos.y + 1;
-        if (ClippedSize.x <= size.x) size.x = ClippedSize.x - 1;
-        if (ClippedSize.y <= size.y) size.y = ClippedSize.y - 1;
+        if (ClippedSize.x <= max.x) max.x = ClippedSize.x - 1;
+        if (ClippedSize.y <= max.y) max.y = ClippedSize.y - 1;
     }
 
-    PreviousClippingRects.push_back(D2D_RECT_F(pos.x, pos.y, pos.x + size.x, pos.y + size.y));
-
-    ImVec2 max(pos.x + size.x, pos.y + size.y);
+	PreviousClippingRects.push_back(D2D_RECT_F(pos.x, pos.y, max.x, max.y));
 
 
 	ImGui::GetBackgroundDrawList()->PushClipRect(pos, max);
@@ -1434,27 +1487,27 @@ void FlarialGUI::PushImClipRect(D2D_RECT_F rect, bool overridePreviousClipping) 
     ImVec2 pos(rect.left, rect.top);
     ImVec2 size(rect.right - rect.left, rect.bottom - rect.top);
 
+	ImVec2 max(pos.x + size.x, pos.y + size.y);
+
     if (!overridePreviousClipping and !PreviousClippingRects.empty())
     {
         ImVec2 ClippedPos(PreviousClippingRects.back().left, PreviousClippingRects.back().top);
-        ImVec2 ClippedSize(PreviousClippingRects.back().right - PreviousClippingRects.back().left, PreviousClippingRects.back().bottom - PreviousClippingRects.back().top);
+        ImVec2 ClippedSize(PreviousClippingRects.back().right, PreviousClippingRects.back().bottom);
 
         if (ClippedPos.x >= pos.x) pos.x = ClippedPos.x + 1;
         if (ClippedPos.y >= pos.y) pos.y = ClippedPos.y + 1;
-        if (ClippedSize.x <= size.x) size.x = ClippedSize.x - 1;
-        if (ClippedSize.y <= size.y) size.y = ClippedSize.y - 1;
+        if (ClippedSize.x <= max.x) max.x = ClippedSize.x - 1;
+        if (ClippedSize.y <= max.y) max.y = ClippedSize.y - 1;
     }
 
-    PreviousClippingRects.push_back(D2D_RECT_F(pos.x, pos.y, pos.x + size.x, pos.y + size.y));
-
-    ImVec2 max(pos.x + size.x, pos.y + size.y);
+    PreviousClippingRects.push_back(D2D_RECT_F(pos.x, pos.y, max.x, max.y));
 
 	ImGui::GetBackgroundDrawList()->PushClipRect(pos, max);
 
 }
 
 void FlarialGUI::PopImClipRect() {
-    PreviousClippingRects .pop_back();
+    PreviousClippingRects.pop_back();
     ImGui::GetBackgroundDrawList()->PopClipRect();
 }
 
@@ -1483,7 +1536,7 @@ void FlarialGUI::NotifyHeartbeat() {
 	float posxModif = 0;
 	float fontSize = Constraints::RelativeConstraint(0.128, "height", true);
 	float textposyModif = Constraints::RelativeConstraint(0.0045f, "height", true);
-	D2D_COLOR_F col = clickgui->getColor("primary1", "ClickGUI");
+	D2D_COLOR_F col = ClickGUI::getColor("primary1");
 
 	int i = 0;
 	for (Notification& n : notifications) {

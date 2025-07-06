@@ -1,16 +1,18 @@
 #include "LowHealthIndicator.hpp"
 
-LowHealthIndicator::LowHealthIndicator(): Module("Low Health", "Warns you when you are at low health.", IDR_HEART_PNG, "")
+LowHealthIndicator::LowHealthIndicator(): Module("Low Health", "Warns you when you are at low health.", IDR_HEART_PNG, "", false)
 {
-    Module::setup();
+    
 }
 
 void LowHealthIndicator::defaultConfig()
 {
+    settings.renameSetting("color", "", "rgb", "health");
     Module::defaultConfig("core");
     setDef("health", 12.f);
     setDef("maxopacity", 0.7f);
     setDef("health", (std::string)"FF0000", 1.f, false);
+    
 }
 
 void LowHealthIndicator::settingsRender(float settingsOffset)
@@ -51,6 +53,7 @@ void LowHealthIndicator::onDisable()
 
 void LowHealthIndicator::onTick(TickEvent& event)
 {
+    if (!this->isEnabled()) return;
     if (SDK::clientInstance) if (SDK::clientInstance->getLocalPlayer())
         health = SDK::clientInstance->getLocalPlayer()->getHealth();
 }

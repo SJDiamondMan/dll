@@ -5,7 +5,7 @@
 PotCounter::PotCounter(): Module("Pot Counter", "Counts how much potions are\nin your inventory.",
                                  IDR_POTION_PNG, "")
 {
-    Module::setup();
+    
 }
 
 void PotCounter::onEnable()
@@ -27,6 +27,7 @@ void PotCounter::defaultConfig()
     setDef("text", (std::string)"{value} Pots");
     setDef("textscale", 0.70f);
     Module::defaultConfig("all");
+    
 }
 
 void PotCounter::settingsRender(float settingsOffset)
@@ -65,6 +66,7 @@ void PotCounter::settingsRender(float settingsOffset)
 
 void PotCounter::onTick(TickEvent& event)
 {
+    if (!this->isEnabled()) return;
     if (SDK::hasInstanced && SDK::clientInstance != nullptr) {
         if (SDK::clientInstance->getLocalPlayer() != nullptr) {
             auto potsCount = 0;
@@ -91,6 +93,7 @@ void PotCounter::onTick(TickEvent& event)
 
 void PotCounter::onRender(RenderEvent& event)
 {
+    if (!this->isEnabled()) return;
     auto potsStr = FlarialGUI::cached_to_string(pots);
     this->normalRender(14, potsStr);
 }

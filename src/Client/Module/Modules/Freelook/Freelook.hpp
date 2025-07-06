@@ -37,7 +37,7 @@ public:
 			originalMovement = std::bit_cast<std::array<std::byte, 4>>(*(std::byte(*)[4]) movement);
 		}
 
-		Module::setup();
+		
 	};
 
 	void onSetup() override;
@@ -59,4 +59,6 @@ public:
 	void onGetViewPerspective(PerspectiveEvent& event);
 
 	void onKey(KeyEvent& event);
+
+	void onMouse(MouseEvent& event);
 };

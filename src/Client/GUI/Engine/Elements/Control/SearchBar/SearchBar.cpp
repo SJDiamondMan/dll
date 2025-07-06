@@ -67,9 +67,9 @@ std::string ClickGUIElements::SearchBar(int index, std::string& text, int limit,
 				FlarialGUI::lerp(searchCutOutHeights[index], -0.5f, 0.12f * FlarialGUI::frameFactor);
 			}
 
-			col = clickgui->getColor("primary1", "ClickGUI");
+			col = ClickGUI::getColor("primary1");
 
-			D2D1_COLOR_F searchbg = clickgui->getColor("secondary4", "ClickGUI");
+			D2D1_COLOR_F searchbg = ClickGUI::getColor("secondary4");
 
 
 			if (FlarialGUI::TextBoxes[index].isActive) FlarialGUI::RoundedRect(x - textWidth, y, searchbg, textWidth, percHeight, round.x, round.x, ImDrawFlags_RoundCornersBottom);
@@ -94,9 +94,15 @@ std::string ClickGUIElements::SearchBar(int index, std::string& text, int limit,
 
 			cursorCol.a = FlarialGUI::TextBoxes[index].cursorOpac;
 
-			FlarialGUI::lerp(FlarialGUI::TextBoxes[index].cursorX,
-				(x - textWidth) + Constraints::RelativeConstraint(0.38, "height") +
-				FlarialGUI::TextSizes[name], 0.420f * FlarialGUI::frameFactor);
+			FlarialGUI::lerp(
+				FlarialGUI::TextBoxes[index].cursorX,
+				(x - textWidth) + Constraints::RelativeConstraint(0.38, "height") + 
+				FlarialGUI::getFlarialTextSize(FlarialGUI::to_wide(text).c_str(),
+					textWidth, percHeight,
+					DWRITE_TEXT_ALIGNMENT_LEADING,
+					Constraints::SpacingConstraint(0.60f, textWidth),
+					DWRITE_FONT_WEIGHT_NORMAL).x,
+				0.420f * FlarialGUI::frameFactor);
 
 			FlarialGUI::RoundedRect(FlarialGUI::TextBoxes[index].cursorX,
 				y + Constraints::RelativeConstraint(0.2f) / 2.0f, cursorCol,

@@ -33,6 +33,13 @@ public:
 	int totalKeybinds = 0;
 	int totalWaypoints = 0;
 	int totalmaps = 0;
+	std::filesystem::path legacySettingsPath;
+
+	std::map<std::string, DWRITE_TEXT_ALIGNMENT> alignments = {
+		{"Left", DWRITE_TEXT_ALIGNMENT_LEADING},
+		{"Center", DWRITE_TEXT_ALIGNMENT_CENTER},
+		{"Right", DWRITE_TEXT_ALIGNMENT_TRAILING}
+	};
 
 	Module(const std::string& ename, const std::string& edescription, int eicon, const std::string& ekey, bool isScripting = false) {
 		name = ename;
@@ -41,10 +48,12 @@ public:
 		defaultKeybind = ekey;
 		isScriptingModule = isScripting;
 		settings = Settings();
-		settingspath = isScripting ? Utils::getClientPath() + "\\Scripts\\Configs\\" + name + ".flarial" : Utils::getConfigsPath() + "\\" + name + ".flarial";
 
-		checkSettingsFile();
-		loadSettings();
+		settingspath = isScripting ? Utils::getClientPath() + "\\Scripts\\Configs\\" + name + ".json" : "this is unused for non scripting modules";
+	}
+
+	void postConstructInitialize() {
+		this->loadSettings();
 	}
 
 	bool active = false;
@@ -78,13 +87,32 @@ public:
 	};
 
 	std::unordered_map<int, std::string> color_pickers;
+	std::unordered_map<int, ColorPickerStruct> color_pickers2;
 
 	template <typename T>
-	T& getOps(std::string setting);
+	void setDef(std::string setting, T value) {
+		this->settings.getOrAddSettingByName<T>(setting, value);
+	}
+
+	void setDef(std::string setting, std::string col, float opac, bool rgb) {
+		this->settings.getOrAddSettingByName<std::string>(setting + "Col", col);
+		this->settings.getOrAddSettingByName<float>(setting + "Opacity", opac);
+		this->settings.getOrAddSettingByName<bool>(setting + "RGB", rgb);
+	}
+
+	void forceDef(std::string setting, std::string col, float opac, bool rgb) {
+		if (this->settings.getSettingByName<std::string>(setting + "Col") != nullptr) this->settings.getSettingByName<std::string>(setting + "Col")->value = col;
+		else this->settings.addSetting(setting + "Col", col);
+		if (this->settings.getSettingByName<float>(setting + "Opacity") != nullptr)this->settings.getSettingByName<float>(setting + "Opacity")->value = opac;
+		else this->settings.addSetting(setting + "Opacity", opac);
+		if (this->settings.getSettingByName<bool>(setting + "RGB") != nullptr)this->settings.getSettingByName<bool>(setting + "RGB")->value = rgb;
+		else this->settings.addSetting(setting + "RGB", rgb);
+	}
 
 	template <typename T>
-	void setDef(std::string setting, T value);
-	void setDef(std::string setting, std::string col, float opac, bool rgb);
+	T& getOps(std::string setting) {
+		return this->settings.getSettingByName<T>(setting)->value;
+	}
 
 	D2D_COLOR_F getColor(std::string text);
 	D2D_COLOR_F getColor(std::string text, std::string mod);
@@ -98,7 +126,11 @@ public:
 		std::function<void()> action);
 
 	void addConditionalTextBox(bool condition, std::string text, std::string subtext, std::string& value, int limit = 16);
+
+	void addConditionalColorPicker(bool condition, std::string text, std::string subtext, std::string& value, float& opacity, bool& rgb);
 	void addConditionalColorPicker(bool condition, std::string text, std::string subtext, std::string settingName);
+
+
 	void addConditionalDropdown(bool condition, std::string text, std::string subtext, const std::vector<std::string>& options, std::string& value);
 
 	void addConditionalToggle(bool condition, std::string text, std::string subtext, bool& value);
@@ -107,8 +139,12 @@ public:
 	void addConditionalSlider(bool condition, std::string text, std::string subtext, std::string settingName, float maxVal = 100.f, float minVal = 0.f, bool zerosafe = true);
 	void addConditionalSlider(bool condition, std::string text, std::string subtext, float& value, float maxVal = 100.0f, float minVal = 0.f, bool zerosafe = true);
 
+	void addConditionalSliderInt(bool condition, std::string text, std::string subtext, std::string settingName, int maxVal = 100, int minVal = 0);
+
 	void addSlider(std::string text, std::string subtext, float& value, float maxVal = 100.0f, float minVal = 0.f, bool zerosafe = true);
 	void addSlider(std::string text, std::string subtext, std::string settingName, float maxVal = 100.0f, float minVal = 0.f, bool zerosafe = true);
+
+	void addSliderInt(std::string text, std::string subtext, std::string settingName, int maxVal = 100, int minVal = 0);
 
 	void addToggle(std::string text, std::string subtext, bool& value);
 	void addToggle(std::string text, std::string subtext, std::string settingName);
@@ -122,13 +158,14 @@ public:
 	void addDropdown(std::string text, std::string subtext, const std::vector<std::string>& options, std::string& value);
 	void addDropdown(std::string text, std::string subtext, const std::vector<std::string>& options, std::string settingName, bool resettable);
 
+	void addColorPicker(std::string text, std::string subtext, std::string& value, float& opacity, bool& rgb);
 	void addColorPicker(std::string text, std::string subtext, std::string settingName);
 
-	virtual void loadDefaults();
-	void saveSettings();
+	virtual void postLoad(bool softLoad = false);
 
-	virtual void loadSettings();
-	void checkSettingsFile();
+	virtual void loadLegacySettings();
+	virtual void loadSettings(bool softLoad = false);
+
 	virtual void toggle();
 	virtual void setup();
 	virtual void onSetup();
@@ -138,6 +175,7 @@ public:
 	bool isEnabled();
 	void setEnabled(bool enabled);
 	void setKeybind(const std::string& newKeybind);
+	std::string& getKeybind(const int keybindCount, bool whoCaresIfItsZeroOrNotTf);
 	std::string& getKeybind(const int keybindCount = 0);
 	virtual void defaultConfig(std::string type);
 	virtual void defaultConfig();

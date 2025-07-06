@@ -5,7 +5,7 @@
 ReachCounter::ReachCounter(): Module("Reach Counter", "Displays your last hit range in blocks.", IDR_REACH_PNG,
                                      "")
 {
-    Module::setup();
+    
 }
 
 void ReachCounter::onEnable()
@@ -29,6 +29,7 @@ void ReachCounter::defaultConfig()
     setDef("text", (std::string)"Reach: {value}");
     setDef("textscale", 0.70f);
     Module::defaultConfig("all");
+    
 }
 
 void ReachCounter::settingsRender(float settingsOffset)
@@ -64,12 +65,14 @@ void ReachCounter::settingsRender(float settingsOffset)
 
 void ReachCounter::onAttack(AttackEvent& event)
 {
+    if (!this->isEnabled()) return;
     Reach = event.getActor()->getLevel()->getHitResult().distance();
     last_hit = std::chrono::high_resolution_clock::now();
 }
 
 void ReachCounter::onTick(TickEvent& event)
 {
+    if (!this->isEnabled()) return;
     std::chrono::duration<double> duration = std::chrono::high_resolution_clock::now() - last_hit;
     if (duration.count() >= 15) Reach = 0.0f;
 

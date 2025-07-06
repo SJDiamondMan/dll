@@ -6,7 +6,7 @@ RenderOptions::RenderOptions(): Module("Render Option", "Change the way how the 
                                        IDR_RENDEROPTIONS_PNG, "")
 {
 
-    Module::setup();
+    
 }
 
 void RenderOptions::updateSetings()
@@ -59,6 +59,7 @@ void RenderOptions::defaultConfig()
     setDef("entity", true);
     setDef("blockentity", true);
     setDef("particles", true);
+    
 }
 
 void RenderOptions::settingsRender(float settingsOffset)
@@ -91,6 +92,7 @@ void RenderOptions::settingsRender(float settingsOffset)
 
 void RenderOptions::onSetupAndRender(SetupAndRenderEvent& event)
 {
+    if (!this->isEnabled()) return;
     if (Options::isInitialized()) {
         updateSetings();
     };

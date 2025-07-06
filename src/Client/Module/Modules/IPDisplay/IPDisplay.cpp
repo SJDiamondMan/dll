@@ -15,6 +15,7 @@ void IPDisplay::defaultConfig() {
     setDef("textscale", 0.80f);
     Module::defaultConfig("all");
     setDef("port", false);
+    
 }
 
 void IPDisplay::settingsRender(float settingsOffset) {
@@ -51,6 +52,7 @@ void IPDisplay::settingsRender(float settingsOffset) {
 }
 
 void IPDisplay::onRender(RenderEvent &event) {
+    if (!this->isEnabled()) return;
     std::string IPStr = SDK::getServerIP();
     std::string port = SDK::getServerPort();
     std::string fullstr = IPStr;

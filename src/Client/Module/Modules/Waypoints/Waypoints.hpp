@@ -1,8 +1,6 @@
 #pragma once
 
 #include "../Module.hpp"
-#include "../../../../Client/GUI/Engine/Engine.hpp"
-#include "Events/Render/RenderEvent.hpp"
 
 struct Waypoint {
 	Vec3<float> position;
@@ -15,9 +13,14 @@ struct Waypoint {
 class Waypoints : public Module {
 private:
 	std::chrono::time_point<std::chrono::high_resolution_clock> last_used;
-	std::unordered_map<std::string, Waypoint> WaypointList;
+
 public:
-	Waypoints();;
+
+	std::unordered_map<std::string, Waypoint> WaypointList;
+
+	Waypoints() : Module("Waypoints", "Allows you to mark points in your world.", IDR_WAYPOINTS_PNG, "") {
+		//Module::setup();
+	};
 
 	void onEnable() override;
 
@@ -37,4 +40,5 @@ public:
 	//get waypoint color D2D1_COLOR_F color = FlarialGUI::HexToColorF(this->settings.getSettingByName<std::string>("color-" + FlarialGUI::cached_to_string(pair.second.index))->value);
 
 	void onKey(KeyEvent& event);
+
 };

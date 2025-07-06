@@ -22,7 +22,7 @@ NoHurtCam::NoHurtCam(): Module("No Hurt Cam", "Disables hurt camera animation", 
     }
 
     Memory::patchBytes( originalCameraAngle.data(), (LPVOID)sigOffset, size);
-    Module::setup();
+    
 }
 
 void NoHurtCam::onEnable()
@@ -42,6 +42,7 @@ void NoHurtCam::onDisable()
 void NoHurtCam::defaultConfig()
 {
     Module::defaultConfig("core");
+    
 }
 
 void NoHurtCam::patch()
@@ -96,6 +97,7 @@ void NoHurtCam::onRaknetTick(RaknetTickEvent& event)
 
 void NoHurtCam::onTick(TickEvent& event)
 {
+    if (!this->isEnabled()) return;
     if (!this->restricted) {
         patch();
     } else {

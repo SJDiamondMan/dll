@@ -1,14 +1,15 @@
 #pragma once
 
 #include "../Module.hpp"
-#include "../../../Client.hpp"
 #include <chrono>
 #include <vector>
+#include <deque>
 
 
-class TickData {
+class TimedObj {
 public:
 	double timestamp;
+	int value;
 };
 
 class JavaDebugMenu : public Module {
@@ -17,14 +18,29 @@ private:
 	std::string lookingAt = "minecraft:empty";
 	std::string lastLookingAt = "";
 	std::vector<std::string> lookingAtTags = {};
+	Biome* curBiome = nullptr;
+
 	Vec3<float> PrevPos{};
-	std::string speed = "0";
+	float xVelo = 0.f;
+	float yVelo = 0.f;
+	float zVelo = 0.f;
+
 	std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
+
 	float lerpYaw = 0.0f;
 	float lerpPitch = 0.0f;
-	static inline std::vector<TickData> tickList;
+
+	static inline std::vector<TimedObj> tickList;
+
 	std::string versionName;
 	std::string cpuName;
+	Perspective curPerspective;
+	float lastBreakProgress = 0.0f;
+	float currentBreakProgress = 0.0f;
+	float cached1PercLow = 0.f;
+	static inline auto last1PercLowUpdate = std::chrono::steady_clock::now();
+
+	std::deque<float> prevFrameTimes;
 
 	static double Microtime() {
 		return (double(std::chrono::duration_cast<std::chrono::microseconds>(
@@ -35,7 +51,7 @@ public:
 
 	JavaDebugMenu() : Module("Java Debug Menu", "Displays Java-style debug information.\nSimilar to F3 menu in Minecraft Java Edition.",
 		IDR_F3_PNG, "F3") {
-		Module::setup();
+			
 	}
 
 	void onEnable() override;
@@ -46,13 +62,23 @@ public:
 
 	void settingsRender(float settingsOffset) override;
 
+	bool isOnBlock(int block);
+
+	bool isOnSetting(std::string settingName, int block);
+
+	void updateTimedVector(std::vector<TimedObj>& vec, float diff);
+
 	static int GetTicks();
+
+	void getOnePercLows();
 
 	std::string getFacingDirection(LocalPlayer* player);
 
 	std::string getCPU();
 
 	std::string getDimensionName();
+
+	std::pair<std::string, std::vector<float>> getWeatherInfo();
 
 	std::string getTime();
 
@@ -66,5 +92,13 @@ public:
 
 	void onKey(KeyEvent& event);
 
+	void onMouse(MouseEvent& event);
+
 	void onHudCursorRendererRender(HudCursorRendererRenderEvent& event);
+
+	void onSetTopScreenName(SetTopScreenNameEvent& event);
+
+	void onGetViewPerspective(PerspectiveEvent& event);
+
+	void drawVector(ImDrawList* drawList, ImVec2 center, ImVec2 endPos, ImU32 col, float lineWidth, float lineLength, float guiscale);
 };

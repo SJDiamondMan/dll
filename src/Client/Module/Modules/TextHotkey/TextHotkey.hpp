@@ -1,11 +1,16 @@
-#pragma once
-
+﻿#pragma once
+#include "Events/EventManager.hpp"
+#include <SDK/Client/Network/Packet/TextPacket.hpp>
+#include "../../../Client.hpp"
 #include "../Module.hpp"
 
 class TextHotkey : public Module {
 	std::chrono::time_point<std::chrono::high_resolution_clock> last_used;
 public:
-	TextHotkey();;
+	TextHotkey() : Module("Text Hotkey", "Send something in chat with a\nclick of a button!",
+		IDR_TEXT_BOX_PNG, "") {
+		
+	};
 
 	void onEnable() override;
 
@@ -14,9 +19,6 @@ public:
 	void defaultConfig() override;
 
 	void settingsRender(float settingsOffset) override;
-
 	void onSetup() override;
-
 	void onKey(KeyEvent& event);
 };
-

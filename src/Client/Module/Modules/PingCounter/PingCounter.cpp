@@ -5,7 +5,7 @@
 PingCounter::PingCounter(): Module("Ping Counter", "Displays your current latency to the server.",
                                    IDR_PING_PNG, "")
 {
-    Module::setup();
+    
 }
 
 void PingCounter::onEnable()
@@ -25,6 +25,7 @@ void PingCounter::defaultConfig()
     setDef("text", (std::string)"{value}ms");
     setDef("textscale", 0.8f);
     Module::defaultConfig("all");
+    
 }
 
 void PingCounter::settingsRender(float settingsOffset)
@@ -62,6 +63,7 @@ void PingCounter::settingsRender(float settingsOffset)
 
 void PingCounter::onRender(RenderEvent& event)
 {
+    if (!this->isEnabled()) return;
     auto pingStr = FlarialGUI::cached_to_string(SDK::getServerPing());
     this->normalRender(11, pingStr);
 }

@@ -22,6 +22,9 @@ void ArmorHUD::onDisable() {
 }
 
 void ArmorHUD::defaultConfig() {
+	settings.renameSetting("colorMain", "colorMain_opacity", "colorMain_rgb", "main");
+	settings.renameSetting("staticDurBarColor", "staticDurBarColor_opacity", "staticDurBarColor_rgb", "staticDurBar");
+	settings.renameSetting("specialMaxDurBarColor", "specialMaxDurBarColor_opacity", "specialMaxDurBarColor_rgb", "specialMaxDurBar");
 	Module::defaultConfig("core");
 	Module::defaultConfig("pos");
 	setDef("textSize", 0.05f);
@@ -39,7 +42,6 @@ void ArmorHUD::defaultConfig() {
 	setDef("textShadowOffset", 0.003f);
 	setDef("textShadow", (std::string)"00000", 0.55f, false);
 	setDef("fillGaps", true);
-	setDef("colorFull_rgb", false);
 	setDef("textOffsetX", 17.55f);
 	setDef("textOffsetY", 7.697f);
 	setDef("showDurBar", true);
@@ -54,6 +56,7 @@ void ArmorHUD::defaultConfig() {
 	setDef("showDurBarMax", false);
 	setDef("100color", 120.f);
 	setDef("0color", 0.f);
+	
 }
 
 void ArmorHUD::settingsRender(float settingsOffset) {
@@ -81,8 +84,7 @@ void ArmorHUD::settingsRender(float settingsOffset) {
 
 	addHeader("Durability");
 	addToggle("Durability Text", "", "showdurability");
-	addSlider("Text Offset X", "", "textOffsetX", 50.f, 0.0f, false);
-	//addConditionalSlider(getOps<bool>("showdurability") && getOps<bool>("vertical"), "Text Offset X", "", "textOffsetX", 50.f, 0.0f, false);
+	addConditionalSlider(getOps<bool>("showdurability") && getOps<bool>("vertical"), "Text Offset X", "", "textOffsetX", 50.f, 0.0f, false);
 	addConditionalSlider(getOps<bool>("showdurability") && !getOps<bool>("vertical"), "Text Offset Y", "", "textOffsetY", 50.f, 0.0f, false);
 	addConditionalSlider(getOps<bool>("showdurability"), "Text Size", "", "textSize", 0.25f, 0.0f, true);
 	addConditionalToggle(getOps<bool>("showdurability"), "Show Durability in %", "", "percent");
@@ -435,7 +437,7 @@ void ArmorHUD::onRender(RenderEvent& event) {
 
 		if (ClickGUI::editmenu) {
 			// bounding boxes
-			FlarialGUI::SetWindowRect(currentPos.x, currentPos.y, width, height, 18);
+			FlarialGUI::SetWindowRect(currentPos.x, currentPos.y, width, height, 18, this->name);
 			checkForRightClickAndOpenSettings(currentPos.x, currentPos.y, width, height);
 		}
 

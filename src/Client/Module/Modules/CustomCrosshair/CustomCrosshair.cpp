@@ -1,5 +1,5 @@
 #include "CustomCrosshair.hpp"
-
+#include "Client.hpp"
 #include "Events/EventManager.hpp"
 #include "Utils/Render/PositionUtils.hpp"
 
@@ -8,6 +8,24 @@ void CustomCrosshair::onEnable() {
     Listen(this, HudCursorRendererRenderEvent, &CustomCrosshair::onHudCursorRendererRender)
     Listen(this, RenderEvent, &CustomCrosshair::onRender)
     Module::onEnable();
+
+    std::string Path = Utils::getClientPath() + "\\Crosshairs";
+
+    for (const auto& entry : std::filesystem::directory_iterator(Path))
+    {
+        auto ch = new CrosshairImage(entry.path().string());
+        Logger::debug("Crosshair: " + entry.path().string());
+
+        std::string name = entry.path().filename().string();
+        crosshairs[name.substr(0, name.size()-4)] = ch;
+
+        Logger::debug("Crosshair loaded: " + name);
+
+    }
+
+    std::cout << crosshairs.empty() << std::endl;
+
+    if (crosshairs.empty()) crosshairs["Crosshair1"] = new CrosshairImage();
 }
 
 void CustomCrosshair::onDisable() {
@@ -18,6 +36,8 @@ void CustomCrosshair::onDisable() {
 }
 
 void CustomCrosshair::defaultConfig() {
+    settings.renameSetting("defaultColor", "defaultOpacity", "defaultColorRGB", "default");
+    settings.renameSetting("enemyColor", "enemyOpacity", "enemyColorRGB", "enemy");
     setDef("uiscale", 1.f);
     Module::defaultConfig("core");
     setDef("CustomCrosshair", false);
@@ -27,7 +47,14 @@ void CustomCrosshair::defaultConfig() {
     setDef("renderInThirdPerson", false);
     setDef("default", (std::string) "fafafa", 0.55f, false);
     setDef("enemy", (std::string) "FF0000", 1.f, false);
+    setDef("CurrentSelectedColor", (std::string)"FFFFFF", 1.f, false);
     setDef("CurrentCrosshair", (std::string)"Crosshair1");
+    setDef("ShowGridLines", true);
+    setDef("HighlightMiddleLine", true);
+
+    getOps<std::string>("CurrentSelectedColorCol") = "FFFFFF";
+    getOps<float>("CurrentSelectedColorOpacity") = 1.f;
+    
 }
 
 void CustomCrosshair::settingsRender(float settingsOffset) {
@@ -47,7 +74,7 @@ void CustomCrosshair::settingsRender(float settingsOffset) {
                               Constraints::RelativeConstraint(1.0, "width"),
                               Constraints::RelativeConstraint(0.88f, "height"));
 
-    if (settings.getSettingByName<bool>("CustomCrosshair")->value) {
+
         addHeader("Crosshair Editor");
         addButton("Crosshair Editor", "Opens the crosshair editor menu", "open", [&]() {
             blankWindow = !blankWindow;
@@ -56,8 +83,11 @@ void CustomCrosshair::settingsRender(float settingsOffset) {
             CrosshairReloaded = true;
         });
 
+        addToggle("Show Grid Lines", "Shows the grid of the canvas.", "ShowGridLines");
+        addToggle("Highlight Middle Line", "Adds 2 red lines to show the middle of the canvas", "HighlightMiddleLine");
+
         extraPadding();
-    }
+
 
     addHeader("Main");
     addToggle("Use Custom Crosshair", "Uses a custom crosshair.","CustomCrosshair");
@@ -86,10 +116,12 @@ void CustomCrosshair::settingsRender(float settingsOffset) {
 }
 
 void CustomCrosshair::onGetViewPerspective(PerspectiveEvent &event) {
+    if (!this->isEnabled()) return;
     currentPerspective = event.getPerspective();
 }
 
 void CustomCrosshair::onHudCursorRendererRender(HudCursorRendererRenderEvent &event) {
+    if (!this->isEnabled()) return;
     if (!SDK::clientInstance) return;
     auto player = SDK::clientInstance->getLocalPlayer();
     if (!player) return;
@@ -130,14 +162,7 @@ void CustomCrosshair::onHudCursorRendererRender(HudCursorRendererRenderEvent &ev
 
     tess->begin(mce::PrimitiveMode::QuadList, 4);
 
-    D2D1_COLOR_F enemyColor = FlarialGUI::HexToColorF(settings.getSettingByName<std::string>("enemyColor")->value);
-    enemyColor.a = settings.getSettingByName<float>("enemyOpacity")->value;
-
-    D2D1_COLOR_F defaultColor = FlarialGUI::HexToColorF(settings.getSettingByName<std::string>("defaultColor")->value);
-    defaultColor.a = settings.getSettingByName<float>("defaultOpacity")->value;
-
-    auto shouldHighlight = settings.getSettingByName<bool>("highlightOnEntity")->value;
-    D2D1_COLOR_F color = isHoveringEnemy && shouldHighlight ? enemyColor : defaultColor;
+    D2D1_COLOR_F color = isHoveringEnemy && getOps<bool>("highlightOnEntity") ? getColor("enemy") : getColor("default");
 
     tess->color(color.r, color.g, color.b, color.a);
 
@@ -158,7 +183,7 @@ void CustomCrosshair::onHudCursorRendererRender(HudCursorRendererRenderEvent &ev
 
     bool useSolid = false;
 
-    if (isHoveringEnemy && shouldHighlight && useSolidColorWhenHighlighted || (!isHoveringEnemy && useSolidColor)) {
+    if (isHoveringEnemy && getOps<bool>("highlightOnEntity") && useSolidColorWhenHighlighted || (!isHoveringEnemy && useSolidColor)) {
         useSolid = true;
     }
 
@@ -181,6 +206,7 @@ void CustomCrosshair::onHudCursorRendererRender(HudCursorRendererRenderEvent &ev
 }
 
 void CustomCrosshair::onRender(RenderEvent &event) {
+    if (!this->isEnabled()) return;
     if (actuallyRenderWindow)
         CrosshairEditorWindow();
     else {

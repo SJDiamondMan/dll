@@ -16,6 +16,7 @@ void BlockBreakIndicator::onDisable() {
 }
 
 void BlockBreakIndicator::defaultConfig() {
+    settings.renameSetting("barFill", "barFillOpacity", "barFillRGB", "barFill");
     Module::defaultConfig("all");
     setDef("textscale", 1.00f);
     setDef("pbmode", true);
@@ -24,6 +25,7 @@ void BlockBreakIndicator::defaultConfig() {
     setDef("pbwidth", 0.91f);
     setDef("pbheight", 0.82f);
     setDef("barFill", (std::string) "a83232", 1.f, false);
+    
 }
 
 void BlockBreakIndicator::settingsRender(float settingsOffset) {
@@ -82,6 +84,7 @@ void BlockBreakIndicator::settingsRender(float settingsOffset) {
 }
 
 void BlockBreakIndicator::normalRender(int index, std::string &value) {
+    if (!this->isEnabled()) return;
     if (SDK::getCurrentScreen() != "hud_screen") return;
 
     if (getOps<bool>("pbmode")) {
@@ -129,7 +132,7 @@ void BlockBreakIndicator::normalRender(int index, std::string &value) {
         }
 
         if (ClickGUI::editmenu) {
-            FlarialGUI::SetWindowRect(coord.x, coord.y, pbwidth, pbheight, index);
+            FlarialGUI::SetWindowRect(coord.x, coord.y, pbwidth, pbheight, index, this->name);
             checkForRightClickAndOpenSettings(coord.x, coord.y, pbwidth, pbheight);
 
             Vec2<float> vec2 = FlarialGUI::CalculateMovedXY(coord.x, coord.y, index, pbwidth, pbheight);
@@ -159,6 +162,16 @@ void BlockBreakIndicator::normalRender(int index, std::string &value) {
             FlarialGUI::BlurRect(
                 D2D1::RoundedRect(D2D1::RectF(coord.x, coord.y, coord.x + pbwidth, coord.y + pbheight),
                                   rounde.x, rounde.x));
+
+        if (getOps<bool>("rectShadow")) FlarialGUI::RoundedRect(
+            coord.x + Constraints::RelativeConstraint(getOps<float>("rectShadowOffset")) * getOps<float>("uiscale"),
+            coord.y + Constraints::RelativeConstraint(getOps<float>("rectShadowOffset")) * getOps<float>("uiscale"),
+            getColor("rectShadow"),
+            pbwidth,
+            pbheight,
+            rounde.x,
+            rounde.y
+        );
 
         FlarialGUI::RoundedRect(coord.x, coord.y, bgColor, pbwidth, pbheight, rounde.x, rounde.y);
 
@@ -195,6 +208,7 @@ void BlockBreakIndicator::normalRender(int index, std::string &value) {
 }
 
 void BlockBreakIndicator::onRender(RenderEvent &event) {
+    if (!this->isEnabled()) return;
     if (
         SDK::hasInstanced && SDK::clientInstance != nullptr &&
         SDK::clientInstance->getLocalPlayer() != nullptr &&
@@ -202,7 +216,7 @@ void BlockBreakIndicator::onRender(RenderEvent &event) {
     ) {
         if (SDK::getCurrentScreen() != "hud_screen") return;
 
-        if (CPSCounter::GetLeftHeld()) {
+        if (MC::heldLeft) {
             Gamemode *gamemode = SDK::clientInstance->getLocalPlayer()->getGamemode();
             auto progress = gamemode->getLastBreakProgress() * 100;
             if (lastProgress != progress) {

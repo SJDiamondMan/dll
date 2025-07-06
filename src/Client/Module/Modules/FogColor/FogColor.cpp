@@ -13,8 +13,10 @@ void FogColor::onDisable() {
 }
 
 void FogColor::defaultConfig() {
+    settings.renameSetting("color", "colorOpacity", "color_rgb", "fog");
     Module::defaultConfig("core");
     setDef("fog", (std::string)"FFFFFF", 0.6f, false);
+    
 }
 
 void FogColor::settingsRender(float settingsOffset) {
@@ -39,9 +41,8 @@ void FogColor::settingsRender(float settingsOffset) {
 }
 
 void FogColor::onGetFogColor(FogColorEvent &event) {
+    if (!this->isEnabled()) return;
     D2D1_COLOR_F color = getColor("fog");
-    /*if (getOps<bool>("fog")) color = FlarialGUI::rgbColor;
-		else color = FlarialGUI::HexToColorF(getOps<std::string>("color"));*/
 
-    event.setFogColorFromD2DColor(color, getOps<float>("colorOpacity"));
+    event.setFogColorFromD2DColor(color, color.a);
 }

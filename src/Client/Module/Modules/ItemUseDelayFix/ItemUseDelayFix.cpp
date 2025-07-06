@@ -12,6 +12,7 @@ void ItemUseDelayFix::onDisable() {
 
 void ItemUseDelayFix::defaultConfig() {
     Module::defaultConfig("core");
+    
 }
 
 void ItemUseDelayFix::patch() {

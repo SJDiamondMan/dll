@@ -21,6 +21,7 @@ void FasterInventory::onDisable() {
 
 void FasterInventory::defaultConfig() {
     Module::defaultConfig("core");
+    
 }
 
 void FasterInventory::onRaknetTick(RaknetTickEvent &event) {
@@ -40,6 +41,7 @@ void FasterInventory::onRaknetTick(RaknetTickEvent &event) {
 }
 
 void FasterInventory::onPacketSend(PacketSendEvent &event) {
+    if (!this->isEnabled()) return;
     if (!SDK::clientInstance->getLocalPlayer()) return;
     if (this->restricted || SDK::getServerPing() < 10) return;
     auto packet = event.getPacket();
@@ -71,6 +73,7 @@ void FasterInventory::onPacketSend(PacketSendEvent &event) {
 }
 
 void FasterInventory::onPacketReceive(PacketEvent &event) {
+    if (!this->isEnabled()) return;
     if (!SDK::clientInstance->getLocalPlayer()) return;
     if (this->restricted || SDK::getServerPing() < 10) return;
     auto packet = event.getPacket();
@@ -97,6 +100,7 @@ void FasterInventory::onPacketReceive(PacketEvent &event) {
 }
 
 void FasterInventory::onTick(TickEvent &event) {
+    if (!this->isEnabled()) return;
     if (!SDK::clientInstance->getLocalPlayer()) return;
     if (this->restricted || SDK::getServerPing() < 10) return;
     if (inventoryOpen != inventoryOpenServerside) {

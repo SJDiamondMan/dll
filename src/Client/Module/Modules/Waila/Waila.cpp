@@ -1,11 +1,6 @@
 #include "Waila.hpp"
-
+#include "Client.hpp"
 #include "Events/EventManager.hpp"
-
-Waila::Waila(): Module("Waila", "Shows what you are looking at.", IDR_WAILA_PNG, "")
-{
-    Module::setup();
-}
 
 void Waila::onEnable()
 {
@@ -28,6 +23,7 @@ void Waila::defaultConfig()
     Module::defaultConfig("all");
     setDef("advanced", false);
     setDef("showAir", false);
+    
 }
 
 void Waila::settingsRender(float settingsOffset)
@@ -65,6 +61,7 @@ void Waila::settingsRender(float settingsOffset)
 
 void Waila::onSetupAndRender(SetupAndRenderEvent& event)
 {
+    if (!this->isEnabled()) return;
     if (!SDK::clientInstance->getLocalPlayer()) return;
     if (!SDK::clientInstance->getLocalPlayer()->getLevel()) return;
     if (!SDK::clientInstance->getBlockSource()) return;

@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <vector>
+#include <stdexcept>
 
 struct MCCColor {
 	union {
@@ -13,7 +14,7 @@ struct MCCColor {
 		};
 		float arr[4]{};
 	};
-	bool shouldDelete = true;
+	// bool shouldDelete = true;
 
 	MCCColor() {
 		this->r = 1.0f;
@@ -27,7 +28,7 @@ struct MCCColor {
 		this->g = other.g;
 		this->b = other.b;
 		this->a = other.a;
-		this->shouldDelete = other.shouldDelete;
+		// this->shouldDelete = other.shouldDelete;
 	}
 
 	explicit MCCColor(const float* arr) {
@@ -56,7 +57,7 @@ struct MCCColor {
 		this->g = g;
 		this->b = b;
 		this->a = a;
-		this->shouldDelete = shouldDelete;
+		// this->shouldDelete = shouldDelete;
 	};
 
 	[[nodiscard]] MCCColor lerp(const MCCColor& o, float t) const;
@@ -267,6 +268,7 @@ public:
 	static std::string getLogsPath();
 
 	static std::string getKeyAsString(int key, bool isCapital = false, bool isKeybind = true);
+	static std::string getMouseAsString(int key);
 
 	static int getStringAsKey(const std::string& str);
 
@@ -321,7 +323,7 @@ public:
 
 	static std::string removeNonAlphanumeric(const std::string& string);
 
-	static std::string removeNonNumeric(const std::string& string);
+	static std::string removeNonNumeric(const std::string& string, bool integer = false);
 
 	static std::vector<std::string> split(std::string_view str, char delimiter);
 

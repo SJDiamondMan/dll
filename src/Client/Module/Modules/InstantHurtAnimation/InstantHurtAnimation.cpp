@@ -1,5 +1,6 @@
 #include "InstantHurtAnimation.hpp"
 
+#include "Client.hpp"
 #include "SDK/Client/Network/Packet/EntityEventPacket.hpp"
 
 void InstantHurtAnimation::onEnable() {
@@ -18,6 +19,7 @@ void InstantHurtAnimation::defaultConfig() {
     Module::defaultConfig("core");
     setDef("onlyWithArmor", true);
     setDef("tryToExcludeTeam", true);
+    
 }
 
 void InstantHurtAnimation::settingsRender(float settingsOffset) {
@@ -41,6 +43,7 @@ void InstantHurtAnimation::settingsRender(float settingsOffset) {
 }
 
 void InstantHurtAnimation::onPacketReceive(PacketEvent& event)  {
+    if (!this->isEnabled()) return;
     auto player = SDK::clientInstance->getLocalPlayer();
     if (!SDK::clientInstance->getLocalPlayer()) return;
     if (event.getPacket()->getId() == MinecraftPacketIds::ActorEvent) {
@@ -66,6 +69,7 @@ void InstantHurtAnimation::onPacketReceive(PacketEvent& event)  {
 }
 
 void InstantHurtAnimation::onAttack(AttackEvent &event) {
+    if (!this->isEnabled()) return;
     if (!event.getActor()->isValid()) return;
     if (!event.getActor()->isValidAABB()) return;
     if (!event.getActor()->hasCategory(ActorCategory::Player)) return;

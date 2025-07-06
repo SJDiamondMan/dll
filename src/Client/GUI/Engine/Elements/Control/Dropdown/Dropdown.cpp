@@ -37,9 +37,9 @@ std::string FlarialGUI::Dropdown(int index, float x, float y, const std::vector<
 	}
 	additionalIndex = index;
 
-	D2D1_COLOR_F unselectedChildCol = clickgui->getColor("primary3", "ClickGUI");
-	D2D1_COLOR_F selectedCol = clickgui->getColor("primary1", "ClickGUI");
-	D2D1_COLOR_F hoveredChildCol = clickgui->getColor("primary4", "ClickGUI");
+	D2D1_COLOR_F unselectedChildCol = ClickGUI::getColor("primary3");
+	D2D1_COLOR_F selectedCol = ClickGUI::getColor("primary1");
+	D2D1_COLOR_F hoveredChildCol = ClickGUI::getColor("primary4");
 
 	if (ClickGUI::settingsOpacity != 1) {
 		unselectedChildCol.a = ClickGUI::settingsOpacity;
@@ -71,22 +71,40 @@ std::string FlarialGUI::Dropdown(int index, float x, float y, const std::vector<
 		}
 	}
 
-	if (!activeColorPickerWindows &&
-		CursorInRect(x, clickingY, Constraints::SpacingConstraint(1.85, textWidth), percHeight + maxHeight)) {
-		if (MC::mouseButton == MouseButton::Left &&
+	if (!activeColorPickerWindows && CursorInRect(x, clickingY, Constraints::SpacingConstraint(1.85, textWidth), FlarialGUI::DropDownMenus[index].isActive ? percHeight + maxHeight : percHeight)) {
+		if (MC::mouseButton == MouseButton::Left && MC::held &&
 			CursorInRect(x, clickingY, Constraints::SpacingConstraint(1.85, textWidth), percHeight)) {
-			//MC::mouseButton = MouseButton::None;
-			FlarialGUI::DropDownMenus[index].isActive = true;
+			WinrtUtils::setCursorTypeThreaded(winrt::Windows::UI::Core::CoreCursorType::Hand);
+		}
+		if (MC::mouseButton == MouseButton::Left && !MC::held &&
+			CursorInRect(x, clickingY, Constraints::SpacingConstraint(1.85, textWidth), percHeight)) {
+			MC::mouseButton = MouseButton::None;
+			FlarialGUI::DropDownMenus[index].isActive = !FlarialGUI::DropDownMenus[index].isActive;
 			value = FlarialGUI::DropDownMenus[index].selected;
+		}
+		if (DropDownMenus[index].firstHover) {
+			WinrtUtils::setCursorTypeThreaded(winrt::Windows::UI::Core::CoreCursorType::Hand);
+			DropDownMenus[index].firstHover = false;
 		}
 	}
-	else if (!CursorInRect(x, clickingY, Constraints::SpacingConstraint(1.85, textWidth), percHeight + maxHeight)) {
+	else if (!CursorInRect(x, clickingY, Constraints::SpacingConstraint(1.85, textWidth), FlarialGUI::DropDownMenus[index].isActive ? percHeight + maxHeight : percHeight)) {
 		if (MC::mouseButton == MouseButton::Left) {
-			//MC::mouseButton = MouseButton::None;
 			FlarialGUI::DropDownMenus[index].isActive = false;
 			value = FlarialGUI::DropDownMenus[index].selected;
+			WinrtUtils::setCursorTypeThreaded(winrt::Windows::UI::Core::CoreCursorType::Arrow);
+			DropDownMenus[index].firstHover = true;
 		}
-		FlarialGUI::lerp(FlarialGUI::DropDownMenus[index].opacityHover, 0.0f, 0.25f * FlarialGUI::frameFactor);
+		else {
+			FlarialGUI::lerp(FlarialGUI::DropDownMenus[index].opacityHover, 0.0f, 0.25f * FlarialGUI::frameFactor);
+			if (!DropDownMenus[index].firstHover && !DropDownMenus[index].isActive) {
+				WinrtUtils::setCursorTypeThreaded(winrt::Windows::UI::Core::CoreCursorType::Arrow);
+				DropDownMenus[index].firstHover = true;
+			}
+			else if (!DropDownMenus[index].firstHover && DropDownMenus[index].isActive) {
+				WinrtUtils::setCursorTypeThreaded(winrt::Windows::UI::Core::CoreCursorType::UniversalNo);
+				DropDownMenus[index].firstHover = true;
+			}
+		}
 	}
 	else if (!FlarialGUI::DropDownMenus[index].isActive) {
 		if (FlarialGUI::DropDownMenus[index].firstTime) {
@@ -94,6 +112,9 @@ std::string FlarialGUI::Dropdown(int index, float x, float y, const std::vector<
 			FlarialGUI::DropDownMenus[index].firstTime = false;
 		}
 		value = FlarialGUI::DropDownMenus[index].selected;
+		if (!DropDownMenus[index].firstHover) {
+			DropDownMenus[index].firstHover = true;
+		}
 	}
 
 	if (FlarialGUI::DropDownMenus[index].isActive) {
@@ -104,8 +125,7 @@ std::string FlarialGUI::Dropdown(int index, float x, float y, const std::vector<
 		FlarialGUI::lerp(additionalY[additionalIndex], addYVal, 0.25f * FlarialGUI::frameFactor);
 
 		FlarialGUI::lerp(y, originalY, 0.25f * FlarialGUI::frameFactor);
-		FlarialGUI::DropDownMenus[index].curColor = FlarialGUI::LerpColor(FlarialGUI::DropDownMenus[index].curColor,
-			selectedCol, 0.1f * FlarialGUI::frameFactor);
+		FlarialGUI::DropDownMenus[index].curColor = FlarialGUI::LerpColor(FlarialGUI::DropDownMenus[index].curColor, CursorInRect(x, clickingY, Constraints::SpacingConstraint(1.85, textWidth), percHeight) ? D2D1::ColorF(selectedCol.r * 0.8, selectedCol.g * 0.8, selectedCol.b * 0.8, selectedCol.a) : selectedCol, 0.1f * FlarialGUI::frameFactor);
 
 		FlarialGUI::lerp(
 			FlarialGUI::DropDownMenus[index].rotation,
@@ -119,9 +139,7 @@ std::string FlarialGUI::Dropdown(int index, float x, float y, const std::vector<
 		FlarialGUI::lerp(additionalY[additionalIndex], -50.f, 0.1f * FlarialGUI::frameFactor);
 
 		FlarialGUI::lerp(y, originalY - maxHeight, 0.25f * FlarialGUI::frameFactor);
-		FlarialGUI::DropDownMenus[index].curColor = FlarialGUI::LerpColor(FlarialGUI::DropDownMenus[index].curColor,
-			unselectedChildCol,
-			0.1f * FlarialGUI::frameFactor);
+		FlarialGUI::DropDownMenus[index].curColor = FlarialGUI::LerpColor(FlarialGUI::DropDownMenus[index].curColor, CursorInRect(x, clickingY, Constraints::SpacingConstraint(1.85, textWidth), percHeight) ? D2D1::ColorF(unselectedChildCol.r * 0.8, unselectedChildCol.g * 0.8, unselectedChildCol.b * 0.8, unselectedChildCol.a) : unselectedChildCol, 0.1f * FlarialGUI::frameFactor);
 		FlarialGUI::lerp(
 			FlarialGUI::DropDownMenus[index].rotation,
 			90.f,

@@ -3,7 +3,7 @@
 MEM::MEM(): Module("Memory", "Shows your current system RAM usage.", IDR_MEMORY_PNG, "")
 {
 
-    Module::setup();
+    
 }
 
 void MEM::onEnable()
@@ -20,8 +20,9 @@ void MEM::onDisable()
 
 void MEM::defaultConfig()
 {
-    if (settings.getSettingByName<float>("textscale") == nullptr) settings.addSetting("textscale", 0.80f);
+    setDef("textscale", 0.8f);
     Module::defaultConfig("all");
+    
 }
 
 void MEM::settingsRender(float settingsOffset)

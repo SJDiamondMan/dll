@@ -3,7 +3,7 @@
 SpeedDisplay::SpeedDisplay(): Module("Speed Display", "Displays your current travel speed in blocks/second.",
                                      IDR_SPEED_PNG, "")
 {
-    Module::setup();
+    
 }
 
 void SpeedDisplay::onEnable()
@@ -24,6 +24,7 @@ void SpeedDisplay::defaultConfig()
 {
     setDef("text", (std::string)"{value} m/s");
     Module::defaultConfig("all");
+    
 }
 
 void SpeedDisplay::settingsRender(float settingsOffset)
@@ -60,11 +61,13 @@ void SpeedDisplay::settingsRender(float settingsOffset)
 
 void SpeedDisplay::onRender(RenderEvent& event)
 {
+    if (!this->isEnabled()) return;
     this->normalRender(15, speed);
 }
 
 void SpeedDisplay::onTick(TickEvent& event)
 {
+    if (!this->isEnabled()) return;
     if (!SDK::clientInstance->getLocalPlayer())
         return;
     auto stateVectorComponent = SDK::clientInstance->getLocalPlayer()->getStateVectorComponent();

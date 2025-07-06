@@ -2,6 +2,7 @@
 
 #include "Events/EventManager.hpp"
 #include "Events/Game/TickEvent.hpp"
+#include <Client.hpp>
 
 void ArrowCounter::onEnable() {
     Listen(this, TickEvent, &ArrowCounter::onTick)
@@ -18,6 +19,7 @@ void ArrowCounter::onDisable() {
 void ArrowCounter::defaultConfig() {
     setDef("text", (std::string)"Arrows: {value}");
     Module::defaultConfig("all");
+    
 }
 
 void ArrowCounter::settingsRender(float settingsOffset) {
@@ -52,6 +54,7 @@ void ArrowCounter::settingsRender(float settingsOffset) {
 }
 
 void ArrowCounter::onTick(TickEvent& event) {
+    if (!this->isEnabled()) return;
     if (SDK::hasInstanced && SDK::clientInstance != nullptr) {
         if (SDK::clientInstance->getLocalPlayer() != nullptr) {
             if (SDK::clientInstance->getLocalPlayer()->getSupplies() != nullptr) {
@@ -86,6 +89,7 @@ void ArrowCounter::onTick(TickEvent& event) {
 }
 
 void ArrowCounter::onRender(RenderEvent& event) {
+    if (!this->isEnabled()) return;
     auto arrowsStr = FlarialGUI::cached_to_string(arrows);
     this->normalRender(13, arrowsStr);
 }

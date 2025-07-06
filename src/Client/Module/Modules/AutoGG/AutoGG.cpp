@@ -1,6 +1,7 @@
 #include "AutoGG.hpp"
 
 #include "Events/EventManager.hpp"
+#include "SDK/Client/Network/Packet/PlayerSkinPacket.hpp"
 
 
 void AutoGG::onEnable() {
@@ -16,6 +17,7 @@ void AutoGG::onDisable() {
 void AutoGG::defaultConfig() {
     Module::defaultConfig("core");
     setDef("text", (std::string)"GG");
+    
 }
 
 void AutoGG::settingsRender(float settingsOffset) {
@@ -41,7 +43,15 @@ void AutoGG::settingsRender(float settingsOffset) {
 }
 
 void AutoGG::onPacketReceive(PacketEvent& event) {
+    if (!this->isEnabled()) return;
     MinecraftPacketIds id = event.getPacket()->getId();
+
+    // if (id == MinecraftPacketIds::PlayerSkin) {
+    //     auto* pkt = reinterpret_cast<PlayerSkinPacket*>(event.getPacket());
+    //     std::cout << pkt->mLocalizedOldSkinName << " -> " << pkt->mLocalizedNewSkinName << std::endl;
+    //     // Logger::debug("{} -> {}", pkt->mLocalizedOldSkinName, pkt->mLocalizedNewSkinName);
+    // }
+
 
     // TODO: add support for other servers (look for "won the game" text)
     if (id == MinecraftPacketIds::SetTitle) {
@@ -79,6 +89,7 @@ void AutoGG::onPacketReceive(PacketEvent& event) {
 }
 
 void AutoGG::SendGG() {
+    if (!this->isEnabled()) return;
     std::string win_message = getOps<std::string>("text");
     if (!win_message.empty()) {
         auto player = SDK::clientInstance->getLocalPlayer();

@@ -10,17 +10,20 @@
 class PlayerNotifier : public Module {
 	int totalPlayers = 0;
 public:
-	PlayerNotifier();;
+	PlayerNotifier() : Module("Player Notifier", "Notifies you when a player is in the server.", IDR_CURSOR_PNG, "P") {
+		/*Module::setup();
+		defaultConfig();
+		loadSettings();*/
+	};
 
 	void defaultConfig() override;
-
 	void onEnable() override;
 
 	void onDisable() override;
 
 	void onSetup() override;
 
-	void loadSettings() override;
+	void loadSettings(bool softLoad) override;
 
 	std::chrono::time_point<std::chrono::high_resolution_clock> lastRun = std::chrono::steady_clock::now();
 	bool first = true;
@@ -41,6 +44,5 @@ public:
 	*/
 
 	void settingsRender(float settingsOffset) override;
-
 	void onKey(KeyEvent& event);;
 };

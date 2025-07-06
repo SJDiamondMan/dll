@@ -4,12 +4,13 @@
 
 Sprint::Sprint(): Module("Toggle Sprint", "Automatically sprints for you!!!", IDR_AUTO_SPRINT_PNG, "CTRL")
 {
-    Module::setup();
+    
 }
 
 void Sprint::onEnable()
 {
     Listen(this, KeyEvent, &Sprint::onKey)
+    Listen(this, MouseEvent, &Sprint::onMouse)
     Listen(this, RenderEvent, &Sprint::onRender)
     Listen(this, TickEvent, &Sprint::onTick)
     Module::onEnable();
@@ -18,6 +19,7 @@ void Sprint::onEnable()
 void Sprint::onDisable()
 {
     Deafen(this, KeyEvent, &Sprint::onKey)
+    Deafen(this, MouseEvent, &Sprint::onMouse)
     Deafen(this, RenderEvent, &Sprint::onRender)
     Deafen(this, TickEvent, &Sprint::onTick)
     Module::onDisable();
@@ -30,6 +32,7 @@ void Sprint::defaultConfig()
     setDef("status", false);
     setDef("textscale", 0.80f);
     setDef("always", false);
+    
 }
 
 void Sprint::settingsRender(float settingsOffset)
@@ -82,13 +85,22 @@ void Sprint::onSetup()
 
 void Sprint::onKey(KeyEvent& event)
 {
+    if (!this->isEnabled()) return;
     if (this->isKeybind(event.keys) && this->isKeyPartOfKeybind(event.key)) {
+        keybindActions[0]({});
+    }
+}
+
+void Sprint::onMouse(MouseEvent &event) {
+    if (!this->isEnabled()) return;
+    if (Utils::getMouseAsString(event.getButton()) == getOps<std::string>("keybind") && event.getAction() == MouseAction::Press) {
         keybindActions[0]({});
     }
 }
 
 void Sprint::onRender(RenderEvent& event)
 {
+    if (!this->isEnabled()) return;
     if (!this->isEnabled() || SDK::getCurrentScreen() != "hud_screen") return;
 
     if (!getOps<bool>("status")) return;
@@ -131,18 +143,21 @@ void Sprint::onRender(RenderEvent& event)
 
 void Sprint::onTick(TickEvent& event)
 {
+    if (!this->isEnabled()) return;
     if (SDK::clientInstance != nullptr) {
         if (SDK::clientInstance->getLocalPlayer() != nullptr) {
             auto* handler = SDK::clientInstance->getLocalPlayer()->getMoveInputHandler();
 
-            if (handler->forward) {
                 if (getOps<bool>("always")) {
                     handler->sprinting = true;
+                    handler->mInputState.mSprintDown = true;
+                    handler->mRawInputState.mSprintDown = true;
                 }
                 else {
-                    if (toggleSprinting) handler->sprinting = toggleSprinting;
+                    handler->sprinting = toggleSprinting;
+                    handler->mInputState.mSprintDown = toggleSprinting;
+                    handler->mRawInputState.mSprintDown = toggleSprinting;
                 }
-            }
         }
     }
 }

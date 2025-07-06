@@ -1,11 +1,11 @@
 #include "ViewModel.hpp"
-
+#include "Client.hpp"
 #include "Events/EventManager.hpp"
 #include "glm/glm/ext/matrix_transform.hpp"
 
 ViewModel::ViewModel(): Module("View Model", "Allows you to modify how item in hand looks.", IDR_EYE_PNG, "C")
 {
-    Module::setup();
+    
 }
 
 void ViewModel::onEnable()
@@ -41,6 +41,10 @@ void ViewModel::defaultConfig()
     setDef("rotx", 0.0f);
     setDef("roty", 0.0f);
     setDef("rotz", 0.0f);
+    setDef("scalex", 1.0f);
+    setDef("scaley", 1.0f);
+    setDef("scalez", 1.0f);
+    
 }
 
 void ViewModel::settingsRender(float settingsOffset)
@@ -71,18 +75,24 @@ void ViewModel::settingsRender(float settingsOffset)
     addSlider("Rotation Y", "Changes the rotation in the Y axis", "roty", 360);
     addSlider("Rotation Z", "Changes the rotation in the Z axis", "rotz", 360);
 
+    addSlider("Scale X", "Changes the scale in the X axis", "scalex", 3, -3);
+    addSlider("Scale Y", "Changes the scale in the Y axis", "scaley", 3, -3);
+    addSlider("Scale Z", "Changes the scale in the Z axis", "scalez", 3, -3);
+
     FlarialGUI::UnsetScrollView();
     resetPadding();
 }
 
 void ViewModel::onGetPerspective(PerspectiveEvent& event)
 {
+    if (!this->isEnabled()) return;
     if (event.getPerspective() == Perspective::FirstPerson) thirdperson = false;
     else thirdperson = true;
 }
 
 void ViewModel::onGetFOV(FOVEvent& event)
 {
+    if (!this->isEnabled()) return;
     auto fov = event.getFOV();
     if (fov != 70) return;
 
@@ -91,6 +101,7 @@ void ViewModel::onGetFOV(FOVEvent& event)
 
 void ViewModel::onRenderItemInHand(RenderItemInHandEvent& event)
 {
+    if (!this->isEnabled()) return;
     if (thirdperson && getOps<bool>("thirdperson") || !thirdperson) {
         auto& matrix = SDK::clientInstance->getCamera().getWorldMatrixStack().top().matrix;
         if (!Matrixed) OriginalMatrix = matrix;
@@ -103,9 +114,15 @@ void ViewModel::onRenderItemInHand(RenderItemInHandEvent& event)
         auto roty = getOps<float>("roty");
         auto rotz = getOps<float>("rotz");
 
+        auto scalex = getOps<float>("scalex");
+        auto scaley = getOps<float>("scaley");
+        auto scalez = getOps<float>("scalez");
+
+
         auto rotAngle = getOps<float>("rotangle");
 
         matrix = glm::translate<float>(matrix, glm::vec3(posx - 4, posy - 4, posz - 4));
         matrix = glm::rotate<float>(matrix, glm::radians(rotAngle), glm::vec3(rotx, roty, rotz));
+        matrix = glm::scale(matrix, glm::vec3(scalex, scaley, scalez));
     }
 }

@@ -20,6 +20,8 @@
 #include <winrt/Windows.UI.ViewManagement.h>
 #include <winrt/Windows.Data.Xml.Dom.h>
 
+#include "Modules/ClickGUI/ClickGUI.hpp"
+
 Version WinrtUtils::impl::getGameVersion() {
     static Version version;
     try {
@@ -46,11 +48,27 @@ std::string WinrtUtils::impl::toRawString(const Version &version) {
     return oss.str();
 }
 
-void WinrtUtils::setCursorType(winrt::Windows::UI::Core::CoreCursorType cursor) {
+winrt::Windows::UI::Core::CoreCursorType WinrtUtils::getCursorType() {
+    winrt::Windows::ApplicationModel::Core::CoreApplication::MainView().CoreWindow().DispatcherQueue().TryEnqueue([]() {
+        auto window = winrt::Windows::ApplicationModel::Core::CoreApplication::MainView().CoreWindow();
+        return window.PointerCursor().Type();
+    });
+    return winrt::Windows::UI::Core::CoreCursorType::Arrow;
+}
+
+void WinrtUtils::setCursor(winrt::Windows::UI::Core::CoreCursor cursor) {
     winrt::Windows::ApplicationModel::Core::CoreApplication::MainView().CoreWindow().DispatcherQueue().TryEnqueue([cursor]() {
         auto window = winrt::Windows::ApplicationModel::Core::CoreApplication::MainView().CoreWindow();
-        window.PointerCursor(winrt::Windows::UI::Core::CoreCursor(cursor, 0));
+        window.PointerCursor(cursor);
+        WinrtUtils::currentCursorType = cursor.Type();
     });
+}
+
+void WinrtUtils::setCursorTypeThreaded(winrt::Windows::UI::Core::CoreCursorType cursor, int resId) {
+    if (ModuleManager::getModule("ClickGUI")->active || ClickGUI::editmenu) {
+        std::thread troll([cursor, resId]() { WinrtUtils::setCursor(winrt::Windows::UI::Core::CoreCursor(cursor, resId)); });
+        troll.detach();
+    }
 }
 
 void WinrtUtils::setWindowTitle(const std::string& title) {

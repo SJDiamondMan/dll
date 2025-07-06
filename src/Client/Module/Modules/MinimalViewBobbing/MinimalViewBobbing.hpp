@@ -9,14 +9,14 @@ private:
     static inline uintptr_t address;
 public:
     MinimalViewBobbing() : Module("Minimal View Bobbing", "Prevent camera shake when view bobbing is on.",
-                           IDR_EYE_PNG, "") {
+                           IDR_EYE_PNG, "", false) {
 
         address = GET_SIG_ADDRESS("MinimalViewBobbing");
 
         original.resize(6);
         Memory::copyBytes((LPVOID) address, original.data(), 6);
 
-        Module::setup();
+        
     };
 
     void onEnable() override {
@@ -31,6 +31,7 @@ public:
 
     void defaultConfig() override {
         Module::defaultConfig("core");
+        
     }
 
     static void patch() {

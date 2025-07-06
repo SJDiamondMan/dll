@@ -3,7 +3,6 @@
 void FOVChanger::onEnable() {
     Listen(this, FOVEvent, &FOVChanger::onGetFOV)
     Module::onEnable();
-
 }
 
 void FOVChanger::onDisable() {
@@ -18,7 +17,6 @@ void FOVChanger::defaultConfig() {
 }
 
 void FOVChanger::settingsRender(float settingsOffset) {
-
     float x = Constraints::PercentageConstraint(0.019, "left");
     float y = Constraints::PercentageConstraint(0.10, "top");
 
@@ -40,6 +38,8 @@ void FOVChanger::settingsRender(float settingsOffset) {
 }
 
 void FOVChanger::onGetFOV(FOVEvent &event) {
+    if (!this->isEnabled()) return;
+    if (auto zoom = ModuleManager::getModule("Zoom"); zoom && zoom->active) return;
     if (!getOps<bool>("fovaffectshand")) {
         if (event.getFOV() == 70) return;
     }

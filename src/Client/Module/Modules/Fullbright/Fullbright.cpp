@@ -15,6 +15,7 @@ void Fullbright::onDisable() {
 void Fullbright::defaultConfig() {
     Module::defaultConfig("core");
     setDef("gamma", 25.f);
+    
 }
 
 void Fullbright::settingsRender(float settingsOffset) {
@@ -38,5 +39,6 @@ void Fullbright::settingsRender(float settingsOffset) {
 }
 
 void Fullbright::onGetGamma(GammaEvent &event) {
+    if (!this->isEnabled()) return;
     event.setGamma(getOps<float>("gamma"));
 }

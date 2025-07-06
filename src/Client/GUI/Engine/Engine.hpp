@@ -15,9 +15,15 @@
 #include "Elements/Control/ColorPicker/ColorPicker.hpp"
 #include "Elements/Control/TextBox/TextBoxStruct.hpp"
 #include "Elements/Control/Slider/SliderRect.hpp"
+#include "Elements/Control/SliderInt/SliderIntRect.hpp"
 #include "Elements/Windows/WindowRect.hpp"
 #include "Elements/Control/Tooltip/ToolTipStruct.hpp"
 #include "Elements/Structs/HSV.hpp"
+#include "../../../Config/Settings.hpp"
+#include <string>
+#include <mutex>
+#include <thread>
+#include <future>
 
 using namespace DirectX;
 
@@ -26,7 +32,8 @@ struct BlurInputBuffer
 	XMFLOAT2 resolution;
 	XMFLOAT2 offset;
 	XMFLOAT2 halfpixel;
-	XMFLOAT2 _dummy;
+	float intensity;
+	float _padding;
 };
 
 
@@ -34,8 +41,8 @@ class Blur
 {
 public:
 
-	static inline ID3D11PixelShader* pUpsampleShader = nullptr;
-	static inline ID3D11PixelShader* pDownsampleShader = nullptr;
+	static inline ID3D11PixelShader* pGaussianBlurHorizontalShader = nullptr;
+	static inline ID3D11PixelShader* pGaussianBlurVerticalShader = nullptr;
 	static inline ID3D11VertexShader* pVertexShader = nullptr;
 	static inline ID3D11InputLayout* pInputLayout = nullptr;
 
@@ -44,17 +51,32 @@ public:
 	static inline ID3D11Buffer* pConstantBuffer = nullptr;
 	static inline BlurInputBuffer constantBuffer;
 
+	// Persistent intermediate textures
+	static inline ID3D11Texture2D* pIntermediateTexture1 = nullptr;
+	static inline ID3D11Texture2D* pIntermediateTexture2 = nullptr;
+	static inline ID3D11RenderTargetView* pIntermediateRTV1 = nullptr;
+	static inline ID3D11RenderTargetView* pIntermediateRTV2 = nullptr;
+	static inline ID3D11ShaderResourceView* pIntermediateSRV1 = nullptr;
+	static inline ID3D11ShaderResourceView* pIntermediateSRV2 = nullptr;
+	static inline UINT currentTextureWidth = 0;
+	static inline UINT currentTextureHeight = 0;
+
+	// Cached render states
+	static inline ID3D11DepthStencilState* pDepthStencilState = nullptr;
+	static inline ID3D11BlendState* pBlendState = nullptr;
+	static inline ID3D11RasterizerState* pRasterizerState = nullptr;
+
 	// RAII
 	static void InitializePipeline();
-	//static void Cleanup();
+	static void Cleanup();
 
 	static void RenderToRTV(ID3D11RenderTargetView*, ID3D11ShaderResourceView*, XMFLOAT2);
 
-	static inline std::vector<ID3D11Texture2D*> framebuffers;
-
-	static inline bool hasDoneFrames = false;
-
 	static void RenderBlur(ID3D11RenderTargetView*, int, float);
+
+private:
+	static bool EnsureIntermediateTextures(UINT width, UINT height);
+	static void ReleaseIntermediateTextures();
 };
 
 class BlurDX12
@@ -70,6 +92,7 @@ public:
 	static inline ID3D11Buffer* pVertexBuffer = nullptr;
 	static inline ID3D11Buffer* pConstantBuffer = nullptr;
 	static inline BlurInputBuffer constantBuffer;
+
 
 	// RAII
 	static void InitializePipeline();
@@ -144,10 +167,15 @@ namespace FlarialGUI {
 
 	extern std::unordered_map<int, WindowRect> WindowRects;
 	extern std::unordered_map<int, SliderRect> SliderRects;
+	extern std::unordered_map<int, SliderIntRect> SliderIntRects;
 	extern std::unordered_map<int, TextBoxStruct> TextBoxes;
 	extern std::unordered_map<int, ColorPicker> ColorPickers;
 	extern std::unordered_map<int, DropdownStruct> DropDownMenus;
 	extern std::unordered_map<int, KeybindSelector> KeybindSelectors;
+	extern std::unordered_map<int, bool> ToggleIsHovering;
+	extern std::unordered_map<int, bool> gears;
+	extern std::unordered_map<int, bool> buttonsHovered;
+	extern std::unordered_map<int, bool> radioButtonsHovered;
 
 	inline int maxRect = 0;
 
@@ -197,12 +225,9 @@ namespace FlarialGUI {
 	std::wstring GetFontFilePath(const std::wstring& fontName, DWRITE_FONT_WEIGHT weight);
 	std::string WideToNarrow(const std::wstring& wideStr);
 
-#ifndef CACHED_TO_STRING_HPP
-#define CACHED_TO_STRING_HPP
 
-#include <string>
-#include <unordered_map>
-#include <mutex>
+
+
 
 	namespace detail {
 		template<typename T>
@@ -236,7 +261,7 @@ namespace FlarialGUI {
 		return result;
 	}
 
-#endif
+
 
 	void PopSize();
 
@@ -287,7 +312,7 @@ namespace FlarialGUI {
 
 	void ScrollBar(float x, float y, float width, float height, float radius);
 
-	void SetWindowRect(float x, float y, float width, float height, int currentNum, float fixer = 0);
+	void SetWindowRect(float x, float y, float width, float height, int currentNum, std::string modname);
 
 	void UnsetWindowRect();
 
@@ -324,6 +349,8 @@ namespace FlarialGUI {
 
 	float Slider(int index, float x, float y, float& value, float maxValue = 100.0f, float minValue = 0.0f, bool zerosafe = true, std::string moduleName = "", std::string settingName = "");
 
+	int SliderInt(int index, float x, float y, int& value, int maxValue = 100, int minValue = 0, std::string moduleName = "", std::string settingName = "");
+
 	void Circle(float x, float y, const D2D1_COLOR_F& color, float radius);
 
 	std::string TextBox(int index, std::string& text, int limit, float x, float y, float width, float height, int special = 0, std::string moduleName = "", std::string settingName = "");
@@ -353,8 +380,10 @@ namespace FlarialGUI {
 
 	void resetColorPicker(size_t index);
 
+	void ColorPicker(const int index, float x, float y, std::string& hex, bool& rgb, std::string moduleName = "", std::string settingName = "");
 	void ColorPicker(const int index, float x, float y, std::string moduleName = "", std::string settingName = "");
 
+	void ColorPickerWindow(int index, std::string& hex, float& opacity, bool& rgb);
 	void ColorPickerWindow(int index, std::string moduleName, std::string settingName);
 
 	D2D1::ColorF HexToColorF(const std::string& hexString);
@@ -362,9 +391,9 @@ namespace FlarialGUI {
 
 	std::wstring to_wide(const std::string& str);
 
-    void PushImClipRect(D2D_RECT_F rect, bool overridePreviousClipping = false);
-    void PushImClipRect(ImVec2 pos, ImVec2 size, bool overridePreviousClipping = false);
-    void PrepareBlur(float intensity);
+	void PushImClipRect(D2D_RECT_F rect, bool overridePreviousClipping = false);
+	void PushImClipRect(ImVec2 pos, ImVec2 size, bool overridePreviousClipping = false);
+	void PrepareBlur(float intensity);
 
 	void PopImClipRect();
 
@@ -441,7 +470,8 @@ namespace FlarialGUI {
 		const float imageWidth, const float imageHeight);
 
 	void LoadAllImages();
-
+	std::future<void> LoadImagesAsync();
+	void CleanupImageResources();
 	std::string Dropdown(int index, float x, float y, const std::vector<std::string>& options, std::string& value, const std::string& label, std::string moduleName = "", std::string settingName = "");
 
 	void image(int resourceId, D2D1_RECT_F rect, LPCTSTR type = "PNG", bool shouldadd = true, ImColor col = IM_COL32_WHITE);

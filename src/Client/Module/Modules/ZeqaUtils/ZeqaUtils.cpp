@@ -1,5 +1,5 @@
 #include "ZeqaUtils.hpp"
-
+#include "Client.hpp"
 #include "Events/EventManager.hpp"
 #include "SDK/Client/Network/Packet/CommandRequestPacket.hpp"
 #include "SDK/Client/Network/Packet/TextPacket.hpp"
@@ -7,7 +7,7 @@
 ZeqaUtils::ZeqaUtils(): Module("Zeqa Utils", "Handy utilities for Zeqa",
                                IDR_ZEQA_PNG, "")
 {
-    Module::setup();
+    
 }
 
 void ZeqaUtils::onEnable()
@@ -32,6 +32,7 @@ void ZeqaUtils::defaultConfig()
     setDef("killstreak", false);
     setDef("friendaccept", false);
     setDef("duelaccept", false);
+    
 }
 
 void ZeqaUtils::settingsRender(float settingsOffset)
@@ -68,6 +69,7 @@ void ZeqaUtils::settingsRender(float settingsOffset)
 
 void ZeqaUtils::onPacketReceive(PacketEvent& event)
 {
+    if (!this->isEnabled()) return;
     MinecraftPacketIds id = event.getPacket()->getId();
     std::string ip = SDK::getServerIP();
     std::transform(ip.begin(), ip.end(), ip.begin(), ::tolower);
